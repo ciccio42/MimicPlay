@@ -54,7 +54,8 @@ import robomimic.utils.tensor_utils as TensorUtils
 import robomimic.utils.file_utils as FileUtils
 import robomimic.utils.env_utils as EnvUtils
 from robomimic.envs.env_base import EnvBase
-
+from PIL import Image
+import tqdm
 
 def extract_trajectory(
     env, 
@@ -94,7 +95,7 @@ def extract_trajectory(
     )
     traj_len = states.shape[0]
     # iteration variable @t is over "next obs" indices
-    for t in range(1, traj_len + 1):
+    for t in tqdm.tqdm(range(1, traj_len + 1)):
 
         # get next observation
         if t == traj_len:
@@ -125,6 +126,8 @@ def extract_trajectory(
         traj["rewards"].append(r)
         traj["dones"].append(done)
 
+        pil_img = Image.fromarray(obs['agentview_image'])
+        pil_img.save(f"debug.png")
         # update for next iter
         obs = deepcopy(next_obs)
 
@@ -153,7 +156,7 @@ def dataset_states_to_obs(args):
         camera_names=args.camera_names, 
         camera_height=args.camera_height, 
         camera_width=args.camera_width, 
-        reward_shaping=args.shaped,
+        reward_shaping=args.shaped
     )
 
     print("==== Using environment with the following metadata ====")
@@ -248,6 +251,12 @@ def dataset_states_to_obs(args):
 
 
 if __name__ == "__main__":
+    # import debugpy
+    # debugpy.listen(('0.0.0.0',5678))
+    # print("Waiting for debugger attach")
+    # debugpy.wait_for_client()
+    
+    
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--dataset",

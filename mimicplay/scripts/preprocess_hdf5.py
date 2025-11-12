@@ -16,7 +16,7 @@ import h5py
 import os
 
 import xml.etree.ElementTree as ET
-
+import debugpy
 
 def replace_relative_path(xml_string):
     """
@@ -63,6 +63,12 @@ def process_file(input_path, output_path=None):
             f["data"][demo_name].attrs["model_file"] = replace_relative_path(f["data"][demo_name].attrs["model_file"])
 
 def main():
+    debugpy.listen(("localhost", 5678))
+    print("Waiting for debugger attach...")
+    debugpy.wait_for_client()
+
+    
+    
     parser = argparse.ArgumentParser(description="Process XML file to replace relative paths.")
     parser.add_argument("-i", "--input", 
                         type=str, 

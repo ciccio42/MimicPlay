@@ -1,10 +1,11 @@
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
+import sys
+sys.path.append('./hand_object_detector')
 
 import _init_paths
 import os
-import sys
 import numpy as np
 import argparse
 import pprint
@@ -281,7 +282,7 @@ if __name__ == '__main__':
 
     demo_name_list = ['demo_{}'.format(i) for i in range(1)]
     val_demo_name = 'demo_1'
-    front_image_indexes = [1, 2]
+    front_image_indexes = [1]
     for front_image_index in front_image_indexes:
         if front_image_index == 1:
             input_video_path = args.left_video
@@ -455,7 +456,7 @@ if __name__ == '__main__':
                         # visualization
                         # print(num_images, 'save_hand_dets', save_hand_dets)
                         im2show = vis_detections_filtered_objects_PIL(im2show, obj_dets, hand_dets, thresh_hand, thresh_obj)
-
+                        
                     misc_toc = time.time()
                     nms_time = misc_toc - misc_tic
 
@@ -535,6 +536,7 @@ if __name__ == '__main__':
                     print(new_f_out['data/{}'.format(demo_name)].attrs["num_samples"])
                     new_f_out.create_dataset('mask/train', data=[demo_name])
                     new_f_out.create_dataset('mask/valid', data=[val_demo_name])
+                
                 # validation demo name
                 obs_path = 'data/' + val_demo_name + '/obs'
                 new_f_out.create_dataset(obs_path + '/hand_loc_{}'.format(front_image_index), data=hand_loc)

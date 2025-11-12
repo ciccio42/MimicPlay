@@ -5,7 +5,9 @@
         "validate": true,
         "logging": {
             "terminal_output_to_txt": true,
-            "log_tb": true
+            "log_tb": true,
+            "log_wandb": false,
+            "wandb_proj_name": "debug"
         },
         "save": {
             "enabled": true,
@@ -25,25 +27,28 @@
         "keep_all_videos": false,
         "video_skip": 5,
         "rollout": {
-            "enabled": false,
+            "enabled": true,
             "n": 10,
             "horizon": 1600,
-            "rate": 10,
+            "rate": 50,
             "warmstart": 0,
             "terminate_on_success": true
         }
     },
     "train": {
-        "data": null,
-        "output_dir": "../trained_models_highlevel_human_pick_place_all_demos",
+        "data": "datasets/image_demo_local.hdf5",
+        "output_dir": "../trained_models_lowlevel",
         "num_data_workers": 2,
-        "hdf5_cache_mode": null,
+        "hdf5_cache_mode": "low_dim",
         "hdf5_use_swmr": true,
-        "hdf5_normalize_obs": false,
         "hdf5_load_next_obs": false,
+        "hdf5_normalize_obs": false,
         "hdf5_filter_key": "train",
         "hdf5_validation_filter_key": "valid",
-        "seq_length": 1,
+        "seq_length": 10,
+        "pad_seq_length": true,
+        "frame_stack": 1,
+        "pad_frame_stack": true,
         "dataset_keys": [
             "actions",
             "rewards",
@@ -58,10 +63,12 @@
     "algo": {
         "optim_params": {
             "policy": {
+                "optimizer_type": "adam",
                 "learning_rate": {
                     "initial": 0.0001,
                     "decay_factor": 0.1,
-                    "epoch_schedule": []
+                    "epoch_schedule": [],
+                    "scheduler_type": "multistep"
                 },
                 "regularization": {
                     "L2": 0.0
@@ -128,7 +135,7 @@
             ]
         },
         "rnn": {
-            "enabled": false,
+            "enabled": true,
             "horizon": 10,
             "hidden_dim": 400,
             "rnn_type": "LSTM",
@@ -140,11 +147,11 @@
         },
         "highlevel": {
             "enabled": true,
-            "ac_dim": 20,
-            "latent_plan_dim": 200
+            "ac_dim": 30,
+            "latent_plan_dim": 400
         },
         "lowlevel": {
-            "enabled": false,
+            "enabled": true,
             "feat_dim": 656,
             "n_layer": 4,
             "n_head": 4,
@@ -155,17 +162,18 @@
             "spatial_softmax_num_kp": 64,
             "gmm_min_std": 0.0001,
             "dropout": 0.1,
-            "trained_highlevel_planner": "",
+            "trained_highlevel_planner": "/user/frosa/Multi-Task-LFD-Framework/repo/mimic-play/MimicPlay/trained_models_highlevel/test/20250920161423/models/model_epoch_303_best_validation_-65.31919860839844.pth",
             "eval_goal_img_window": 30,
             "eval_max_goal_img_iter": 5
         },
         "playdata": {
-            "enabled": true,
+            "enable": false,
             "goal_image_range": [
                 100,
                 200
             ],
-            "eval_goal_gap": 150
+            "eval_goal_gap": 150,
+            "enabled": true
         }
     },
     "observation": {
@@ -173,10 +181,12 @@
             "obs": {
                 "low_dim": [
                     "robot0_eef_pos",
-                    "robot0_eef_pos_future_traj"
+                    "robot0_eef_quat",
+                    "robot0_gripper_qpos"
                 ],
                 "rgb": [
-                    "agentview_image"
+                    "agentview_image",
+                    "robot0_eye_in_hand_image"
                 ],
                 "depth": [],
                 "scan": []
@@ -207,7 +217,7 @@
                         "pretrained": false,
                         "input_coord_conv": false
                     },
-                    "pool_class": null,
+                    "pool_class": "SpatialSoftmax",
                     "pool_kwargs": {
                         "num_kp": 32,
                         "learnable_temperature": false,
@@ -292,5 +302,10 @@
                 }
             }
         }
+    },
+    "meta": {
+        "hp_base_config_file": null,
+        "hp_keys": [],
+        "hp_values": []
     }
 }

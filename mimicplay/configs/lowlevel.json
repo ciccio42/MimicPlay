@@ -155,13 +155,16 @@
             "spatial_softmax_num_kp": 64,
             "gmm_min_std": 0.0001,
             "dropout": 0.1,
-            "trained_highlevel_planner": "checkpoints/highlevel_model_epoch_357_best_validation_-65.05948219299316.pth",
+            "trained_highlevel_planner": "/user/frosa/Multi-Task-LFD-Framework/repo/mimic-play/MimicPlay/trained_models_highlevel/test/20250920161423/models/model_epoch_303_best_validation_-65.31919860839844.pth",
             "eval_goal_img_window": 30,
             "eval_max_goal_img_iter": 5
         },
         "playdata": {
             "enabled": true,
-            "goal_image_range": [100, 200],
+            "goal_image_range": [
+                100,
+                200
+            ],
             "eval_goal_gap": 150
         }
     },

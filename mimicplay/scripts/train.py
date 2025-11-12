@@ -33,6 +33,8 @@ from collections import OrderedDict
 import torch
 from torch.utils.data import DataLoader
 
+import debugpy
+
 import robomimic.utils.train_utils as TrainUtils
 import robomimic.utils.torch_utils as TorchUtils
 import robomimic.utils.obs_utils as ObsUtils
@@ -43,6 +45,8 @@ from robomimic.utils.log_utils import PrintLogger, DataLogger
 from mimicplay.configs import config_factory
 from mimicplay.algo import algo_factory, RolloutPolicy
 from mimicplay.utils.train_utils import get_exp_dir, rollout_with_stats, load_data_for_training
+
+
 
 def train(config, device):
     """
@@ -375,6 +379,11 @@ def main(args):
 
 
 if __name__ == "__main__":
+    
+    # debugpy.listen(("localhost", 5678))
+    # print("Waiting for debugger attach...")
+    # debugpy.wait_for_client()
+
     parser = argparse.ArgumentParser()
 
     # External config file that overwrites default config

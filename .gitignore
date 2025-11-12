@@ -5,3 +5,9 @@ datasets/
 trained_models_highlevel
 
 *.mp4
+*.avi
+mimicplay/*png
+events.*
+model_epoch*
+log*
+*txt
