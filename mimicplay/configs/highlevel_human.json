@@ -35,7 +35,7 @@
     },
     "train": {
         "data": null,
-        "output_dir": "../trained_models_highlevel_human_pick_place_all_demos",
+        "output_dir": "../trained_models_highlevel_human_pick_place_all_demos_augmented_last_frame_as_goal",
         "num_data_workers": 2,
         "hdf5_cache_mode": null,
         "hdf5_use_swmr": true,
@@ -49,7 +49,7 @@
             "rewards",
             "dones"
         ],
-        "goal_mode": "nstep",
+        "goal_mode": "last",
         "cuda": true,
         "batch_size": 32,
         "num_epochs": 3000,

@@ -143,11 +143,11 @@ if __name__ == '__main__':
                         help='If set, include end-effector position in pixel space.')
     args = parser.parse_args()
 
-    # debugpy.listen(5678)
-    # print("Waiting for debugger attach...")
-    # debugpy.wait_for_client()
+    debugpy.listen(5678)
+    print("Waiting for debugger attach...")
+    debugpy.wait_for_client()
 
-    task_list = glob.glob(os.path.join(args.data_dir, 'task_*'))
+    task_list = glob.glob(os.path.join(args.data_dir, 'task_15'))
     
     task_list.sort(key=lambda x: int(x.split('_')[-1]))
 

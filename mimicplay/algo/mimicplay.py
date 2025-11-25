@@ -91,7 +91,11 @@ class Highlevel_GMM_pretrain(BC_Gaussian):
          
     def perform_test_predictions(self, save_folder, agent_path=None, validation=True, same_video=True):
 
-        save_path = os.path.join("..", save_folder, 'test_high_level')
+        if agent_path is not None:
+            agent_real = True if 'real' in agent_path else False
+        
+        exp_name = f"prompt_real_human_agent_real_{agent_real}"
+        save_path = os.path.join("..", save_folder,"test/", f"video_{exp_name}")
         os.makedirs(save_path, exist_ok=True)
 
         # create obs and goal dict

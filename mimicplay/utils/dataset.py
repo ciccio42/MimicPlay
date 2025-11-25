@@ -3,8 +3,11 @@ import random
 import robomimic.utils.tensor_utils as TensorUtils
 import robomimic.utils.obs_utils as ObsUtils
 import robomimic.utils.log_utils as LogUtils
-
+import numpy as np
 from robomimic.utils.dataset import SequenceDataset
+from PIL import Image
+import copy 
+import cv2
 
 class PlaydataSequenceDataset(SequenceDataset):
     def __init__(
@@ -24,6 +27,8 @@ class PlaydataSequenceDataset(SequenceDataset):
             hdf5_normalize_obs=False,
             filter_by_attribute=None,
             load_next_obs=True,
+            perform_aug=True,
+            aug_p = 0.5
     ):
         """
         Dataset class for fetching sequences of experience.
@@ -98,7 +103,7 @@ class PlaydataSequenceDataset(SequenceDataset):
 
         self.goal_mode = goal_mode
         if self.goal_mode is not None:
-            assert self.goal_mode in ["nstep"]
+            assert self.goal_mode in ["nstep", "last"]
 
         self.pad_seq_length = pad_seq_length
         self.pad_frame_stack = pad_frame_stack
@@ -143,7 +148,29 @@ class PlaydataSequenceDataset(SequenceDataset):
             self.hdf5_cache = None
 
         self.close_and_delete_hdf5_handle()
+        self.perform_aug = perform_aug
+        self.aug_p = aug_p
 
+    def recolor_arm(self, img, color, new_color):
+        pil_img = Image.fromarray(img)
+        pil_img.save("original_img.png")
+        
+        new_img = copy.deepcopy(img)
+        mask_img = new_img<=color
+        mask_img = np.sum(mask_img, axis=2)==3
+        mask_img[:, :30] = False        
+        mask_img[:, 100:] = False
+        # erosion to remove isolated points
+        mask_img = np.array(cv2.erode(np.array(mask_img, np.uint8), np.ones((3,3), np.uint8)), np.bool)
+        
+                               
+        new_img[mask_img, :]=new_color
+        pil_img = Image.fromarray(new_img)
+        pil_img.save("new_img.png")
+        
+        return new_img
+        
+        
 
     def get_item(self, index):
         """
@@ -174,6 +201,8 @@ class PlaydataSequenceDataset(SequenceDataset):
         goal_index = None
         if self.goal_mode == "nstep":
             goal_index = min(index_in_demo + random.randint(self.goal_obs_gap[0], self.goal_obs_gap[1]) , demo_length) - 1
+        if self.goal_mode == "last":
+            goal_index = demo_length - 1
 
         meta["obs"] = self.get_obs_sequence_from_demo(
             demo_id,
@@ -203,5 +232,22 @@ class PlaydataSequenceDataset(SequenceDataset):
                 seq_length=self.seq_length,
                 prefix="obs",
             )
-
+        
+        aug = np.random.choice([1, 0], p=[self.aug_p, 1-self.aug_p])
+        if aug and self.perform_aug:
+            # pick color for arm
+            arm_color = [40,40,40]
+            new_arm_color = np.random.randint(0, 255, size=3).tolist()
+            meta["obs"]["agentview_image"] = self.recolor_arm(meta["obs"]["agentview_image"][0], 
+                                                              color=arm_color,
+                                                              new_color=new_arm_color)[None]
+            if "next_obs" in meta.keys():
+                meta["next_obs"]["agentview_image"] = self.recolor_arm(meta["next_obs"]["agentview_image"][0], 
+                                                              color=arm_color,
+                                                              new_color=new_arm_color)[None]
+            if "goal_obs" in meta.keys():
+                meta["goal_obs"]["agentview_image"] = self.recolor_arm(meta["goal_obs"]["agentview_image"][0], 
+                                                              color=arm_color,
+                                                              new_color=new_arm_color)[None]
+                
         return meta

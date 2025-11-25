@@ -2,7 +2,7 @@
 *.egg-info
 
 datasets/
-trained_models_highlevel
+trained_models_*
 
 *.mp4
 *.avi

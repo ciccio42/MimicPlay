@@ -22,3 +22,14 @@ python generate_merged_dataset.py
 
 **NOTE**
 For human you need to start from *.mp4 video
+
+
+## 3. Train Latent Planner
+```bash
+python scripts/train.py --config configs/highlevel_human.json --dataset /user/frosa/multi_task_lfd/datasets/pick_place/human_rgb_pick_place/hdf5/merged_dataset/human_pick_place_all_demos.hdf5
+```
+
+## 4. Test Latent Planner
+```bash
+python test_highlevel.py --config /user/frosa/Multi-Task-LFD-Framework/repo/mimic-play/MimicPlay/trained_models_highlevel_human_pick_place_all_demos_augmented/test/20251113182127/config.json  --checkpoint /user/frosa/Multi-Task-LFD-Framework/repo/mimic-play/MimicPlay/trained_models_highlevel_human_pick_place_all_demos_augmented/test/20251113182127/models/model_epoch_173_best_validation_-45.142740631103514.pth  --video_prompt "/user/frosa/multi_task_lfd/datasets/pick_place/human_rgb_pick_place/hdf5/merged_dataset/human_pick_place_all_demos.hdf5" --agent_path "/user/frosa/multi_task_lfd/ur_multitask_dataset/pick_place/real_new_ur5e_pick_place/hdf5_files/merged_dataset/real_ur5e_all_demos.hdf5"
+```
