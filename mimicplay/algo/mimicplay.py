@@ -157,9 +157,9 @@ class Highlevel_GMM_pretrain(BC_Gaussian):
 
                     if agent_path is not None:
                         # agent_task = agent_path.split('/')[-2]
-                        video_save_path = os.path.join(save_path, f'pred_task_{task_agent}_agent_{agent_key.decode()}_demo_{demo_key.decode()}.avi')
+                        video_save_path = os.path.join(save_path, f'pred_task_{task_agent}_agent_{agent_key.decode()}_demo_{demo_key.decode()}.mp4')
                     else:
-                        video_save_path = os.path.join(save_path, f'pred_task_{task_agent}_agent_{agent_key.decode()}_demo_{demo_key.decode()}.avi')
+                        video_save_path = os.path.join(save_path, f'pred_task_{task_agent}_agent_{agent_key.decode()}_demo_{demo_key.decode()}.mp4')
 
                     video_writer  = cv2.VideoWriter(video_save_path, fourcc, 10.0, (2*120, 120))
 

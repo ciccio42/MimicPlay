@@ -1,5 +1,8 @@
 # MimicPlay
 
+## Hand-Object Detector
+Follow the instruction in the original directory
+
 ## 1. Create human-video dataset
 
 ```bash

@@ -124,11 +124,18 @@ if __name__ == '__main__':
     parser.add_argument('--convert_from_3D_to_px_space_flag', 
                         action='store_true', 
                         help='If set, include end-effector position in pixel space.')
+    parser.add_argument('--plot', 
+                        action='store_true')
+    parser.add_argument('--debug', 
+                        action='store_true')
+    
+    
     args = parser.parse_args()
 
-    # debugpy.listen(5678)
-    # print("Waiting for debugger attach...")
-    # debugpy.wait_for_client()
+    if args.debug:
+        debugpy.listen(5678)
+        print("Waiting for debugger attach...")
+        debugpy.wait_for_client()
 
     task_list = glob.glob(os.path.join(args.data_dir, 'task_*'))
     
@@ -188,9 +195,11 @@ if __name__ == '__main__':
                         crop_params = CROP_PARAMS
                     )
                     # plot the adjusted point on the cropped and resized image
-                    os.makedirs('debug_images', exist_ok=True)
-                    cv2.circle(agent_view, (eef_pos[1], eef_pos[0]), 3, (0, 0, 255), 3)
-                    cv2.imwrite(f'debug_images/agent_view_cropped_resized_{t}.png', agent_view[:,:,::-1])
+                    if args.plot:
+                        os.makedirs('debug_images', exist_ok=True)
+                        plot_imgq = copy.deepcopy(agent_view)
+                        cv2.circle(plot_imgq, (eef_pos[1], eef_pos[0]), 3, (0, 0, 255), 3)
+                        cv2.imwrite(f'debug_images/agent_view_cropped_resized_{t}.png', plot_imgq[:,:,::-1])
                     eef_pos = np.array(eef_pos) / agent_view.shape[0]  # normalize to [0, 1]
                     
                     
@@ -225,9 +234,11 @@ if __name__ == '__main__':
                         img_height = traj[t]['obs']['camera_front_image'].shape[0]
                     )
                     
-                    # plot the projected point on the agent view image
-                    # cv2.circle(np.asarray(traj[t]['obs']['camera_front_image']), (next_pos_px_space[1], next_pos_px_space[0]), 3, (0, 0, 255), 3)
-                    # cv2.imwrite(f'agent_view_{t}_{i}.png', traj[t]['obs']['camera_front_image'][:,:,::-1])
+                    if args.plot:
+                        # plot the projected point on the agent view image
+                        plot_img = copy.deepcopy(traj[t]['obs']['camera_front_image'])
+                        cv2.circle(plot_img, (next_pos_px_space[1], next_pos_px_space[0]), 3, (0, 0, 255), 3)
+                        cv2.imwrite(f'agent_view_{t}_{i}.png', plot_img[:,:,::-1])
                     
                     # adjust point to cropped and resized image
                     next_pos_space = adjust_point_to_cropped_resized_image(
@@ -236,11 +247,15 @@ if __name__ == '__main__':
                         target_size = TARGET_IMG_SIZE,
                         crop_params = CROP_PARAMS
                     )
+                    robot_future_eef_pos.extend(np.array(next_pos_space)/agent_view.shape[0])  # normalize to [0, 1]
                     
-                    # plot the adjusted point on the cropped and resized image
-                    # cv2.circle(agent_view, (next_pos_space[1], next_pos_space[0]), 3, (0, 0, 255), 3)
-                    # cv2.imwrite(f'agent_view_cropped_resized_{t}_{i}.png', agent_view[:,:,::-1])
-                    robot_future_eef_pos.extend(next_pos_px_space/agent_view.shape[0])  # normalize to [0, 1]
+                    
+                    if args.plot:
+                        # plot the adjusted point on the cropped and resized image
+                        plot_img = copy.deepcopy(agent_view)
+                        cv2.circle(plot_img, (next_pos_space[1], next_pos_space[0]), 3, (0, 0, 255), 3)
+                        cv2.imwrite(f'agent_view_cropped_resized_{t}_{i}.png', plot_img[:,:,::-1])
+                        
                 
                 robot_future_eef_pos_list.append(robot_future_eef_pos)
 
@@ -290,9 +305,10 @@ if __name__ == '__main__':
                 hf['data'].attrs['total'] = len(action_list)
                 hf['data'].attrs['task'] = task_name
                 
-                hf.create_dataset('data/'+demo_name+'/action', data=np.array(action_list))
-                hf.create_dataset('data/'+demo_name+'/reward', data=np.array(reward_list))
-                hf.create_dataset('data/'+demo_name+'/done', data=np.array(done_list))
+                hf.create_dataset('data/'+demo_name+'/actions_robot', data=np.array(action_list))
+                hf.create_dataset('data/'+demo_name+'/actions', data=np.array(robot_future_eef_pos_list))
+                hf.create_dataset('data/'+demo_name+'/rewards', data=np.array(reward_list))
+                hf.create_dataset('data/'+demo_name+'/dones', data=np.array(done_list))
                 
                 
                 

@@ -7,21 +7,29 @@ import cv2
 import json
 from PIL import Image
 import copy
+import numpy as np
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Generate human dataset')
     parser.add_argument('--task_folder', default="/user/frosa/multi_task_lfd/ur_multitask_dataset/pick_place/real_new_ur5e_pick_place/hdf5_files/", type=str, help='Path to the task folder')
     parser.add_argument('--output_folder', default="/user/frosa/multi_task_lfd/ur_multitask_dataset/pick_place/real_new_ur5e_pick_place/hdf5_files/merged_dataset", type=str, help='Path to the output folder')
+    parser.add_argument('--robot_name', default="provola", type=str, help='Name of the robot')
     parser.add_argument('--dataset_type', default="all_demos", type=str, help='Type of dataset to generate')
+    parser.add_argument('--debug', action='store_true', help='Enable debug mode')
+    
     args = parser.parse_args()
 
-    # debugpy.listen(("localhost", 5678))
-    # print("Waiting for debugger attach...")
-    # debugpy.wait_for_client()
-    # print("Debugger attached.")
+    if args.debug:
+        debugpy.listen(("localhost", 5678))
+        print("Waiting for debugger attach...")
+        debugpy.wait_for_client()
+        print("Debugger attached.")
+
+    real_robot = True if "real" in args.task_folder else False
+    train_val_split = 0.8
 
     os.makedirs(args.output_folder, exist_ok=True)
-    new_fout = h5py.File(os.path.join(args.output_folder, f"ur5e_{args.dataset_type}.hdf5"), "w")
+    new_fout = h5py.File(os.path.join(args.output_folder, f"{args.robot_name}_{args.dataset_type}.hdf5"), "w")
     
     
     task_folders = glob.glob(os.path.join(args.task_folder, "task_*"))
@@ -43,6 +51,7 @@ if __name__ == '__main__':
         elif args.dataset_type == "all_demos":
             hdf5_files = sorted(hdf5_files, key=lambda x: int(x.split("/")[-1].split(".")[0].split("traj")[-1]))
         
+        train_num_files = int(len(hdf5_files) * train_val_split)
         
         for hdf5_file in hdf5_files:
             # print(f"\t{hdf5_file}")
@@ -64,7 +73,11 @@ if __name__ == '__main__':
                     print(f"Key: {key}")
                     
                     if isinstance(demo_0[key], h5py.Dataset):
-                        new_fout.create_dataset(f"data/demo_{demo_number}/{key}", data=demo_0[key][...])
+                        if 'dones' in key:
+                            # convert to float64 to save space
+                            new_fout.create_dataset(f"data/demo_{demo_number}/{key}", data=demo_0[key][...].astype(np.float64))
+                        else:
+                            new_fout.create_dataset(f"data/demo_{demo_number}/{key}", data=demo_0[key][...])
                     else:
                         for subkey in demo_0[key].keys():
                             if '_0' in subkey:
@@ -74,7 +87,12 @@ if __name__ == '__main__':
                                 
                             if subkey != "agentview_image" and subkey != 'front_image_0':
                                 print(f"\tSubkey: {subkey}")
-                                new_fout.create_dataset(f"data/demo_{demo_number}/{key}/{new_subkey}", data=demo_0[key][subkey][...])
+                                
+                                if len(demo_0[key][subkey].shape) == 2:
+                                    new_fout.create_dataset(f"data/demo_{demo_number}/{key}/{new_subkey}", data=np.array(demo_0[key][subkey][...][:, None, :]))
+                                else:
+                                    new_fout.create_dataset(f"data/demo_{demo_number}/{key}/{new_subkey}", data=demo_0[key][subkey][...])
+                                    
                             elif subkey == "agentview_image" or subkey == 'front_image_0':
                                 print(f"\tSubkey: {subkey}")
                                 images = []
@@ -94,7 +112,7 @@ if __name__ == '__main__':
                                     else:
                                         final_img = copy.deepcopy(img)
                                         images.append(final_img)
-
+                                          
                                 new_fout.create_dataset(f"data/demo_{demo_number}/{key}/{new_subkey}", data=images)
                                 
                 
@@ -114,7 +132,7 @@ if __name__ == '__main__':
                         val_demo_number.append(demo_number)
                 elif args.dataset_type == "all_demos":
                     traj_num = int(hdf5_file.split("/")[-1].split(".")[0].split("traj")[-1])
-                    if traj_num < 20:
+                    if traj_num < train_num_files:
                         train_demo_number.append(demo_number)
                     else:
                         val_demo_number.append(demo_number)

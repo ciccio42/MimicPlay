@@ -329,9 +329,9 @@ if __name__ == '__main__':
                 hf['data'].attrs['total'] = len(action_list)
                 hf['data'].attrs['task'] = task_name
 
-                hf.create_dataset('data/'+demo_name+'/action', data=np.array(action_list))
-                hf.create_dataset('data/'+demo_name+'/reward', data=np.array(reward_list))
-                hf.create_dataset('data/'+demo_name+'/done', data=np.array(done_list))
+                hf.create_dataset('data/'+demo_name+'/actions', data=np.array(action_list))
+                hf.create_dataset('data/'+demo_name+'/rewards', data=np.array(reward_list))
+                hf.create_dataset('data/'+demo_name+'/dones', data=np.array(done_list))
                 
                 
                 
