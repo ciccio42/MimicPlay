@@ -100,7 +100,8 @@ def test(config, args, device):
 
     model.policy.perform_test_predictions(save_folder=config.train.output_dir, 
                                           validation=True,
-                                          agent_path=args.agent_path)
+                                          agent_path=args.agent_path,
+                                          sample_goal=True if 'intermediate' in config.train.output_dir else False)
     
 
 def main(args):

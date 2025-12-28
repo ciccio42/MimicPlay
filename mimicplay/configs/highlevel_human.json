@@ -35,8 +35,8 @@
     },
     "train": {
         "data": null,
-        "output_dir": "../trained_models_highlevel_human_panda_pick_place_all_demos_augmented_last_frame_as_goal",
-        "num_data_workers": 8,
+        "output_dir": "../trained_models_highlevel_human_panda_pick_place_all_demos_augmented_goal_intermediate_mix_agent_demo",
+        "num_data_workers": 16,
         "hdf5_cache_mode": null,
         "hdf5_use_swmr": true,
         "hdf5_normalize_obs": false,
@@ -49,11 +49,12 @@
             "rewards",
             "dones"
         ],
-        "goal_mode": "last",
+        "goal_mode": "nstep",
         "cuda": true,
         "batch_size": 32,
         "num_epochs": 3000,
-        "seed": 1
+        "seed": 1,
+        "mix_agent_demo": true
     },
     "algo": {
         "optim_params": {
@@ -162,8 +163,8 @@
         "playdata": {
             "enabled": true,
             "goal_image_range": [
-                100,
-                200
+                1,
+                20
             ],
             "eval_goal_gap": 150
         }

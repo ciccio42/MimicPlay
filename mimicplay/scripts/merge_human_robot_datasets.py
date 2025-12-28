@@ -12,7 +12,8 @@ from tqdm import tqdm
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Generate human dataset')
-    parser.add_argument('--dataset_paths', type=list, help='List of dataset paths to merge', nargs='+', default=["/user/frosa/multi_task_lfd/datasets/pick_place/human_rgb_pick_place/hdf5/merged_dataset/human_pick_place_all_demos.hdf5", "/user/frosa/multi_task_lfd/ur_multitask_dataset/pick_place/panda_pick_place/hdf5_files/merged_dataset/panda_pick_place_all_demos.hdf5"])
+    parser.add_argument('--dataset_paths', type=str, help='List of dataset paths to merge', nargs='+', default=["/user/frosa/multi_task_lfd/datasets/pick_place/human_rgb_pick_place/hdf5/merged_dataset/human_pick_place_all_demos.hdf5", "/user/frosa/multi_task_lfd/ur_multitask_dataset/pick_place/panda_pick_place/hdf5_files/merged_dataset/panda_pick_place_all_demos.hdf5"])
+    parser.add_argument('--robots_name', default=["ur5e"], type=str, help='List of robot names corresponding to dataset paths', nargs='+')
     parser.add_argument('--output_file_path', default=None, type=str, help='Path to the output file')
     args = parser.parse_args()
 
@@ -21,9 +22,12 @@ if __name__ == '__main__':
     # debugpy.wait_for_client()
     # print("Debugger attached.")
 
+    print(f"Dataset paths to merge: {args.dataset_paths}")
     if args.output_file_path is None:
         human_dataset_name = args.dataset_paths[0].split("/")[-1]
-        args.output_file_path = args.dataset_paths[0].replace(human_dataset_name, f"human_panda_robot_merged.hdf5")
+        robots_name_list = "_".join(args.robots_name)
+        args.output_file_path = args.dataset_paths[0].replace(human_dataset_name, f"human_{robots_name_list}_robot_merged.hdf5")
+        print(f"Output file path not provided. Using default: {args.output_file_path}")
         
     # open human dataset
     human_dataset_file = h5py.File(args.dataset_paths[0], "r")

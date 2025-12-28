@@ -161,7 +161,10 @@
         },
         "playdata": {
             "enabled": true,
-            "goal_image_range": [100, 200],
+            "goal_image_range": [
+                100,
+                200
+            ],
             "eval_goal_gap": 150
         }
     },

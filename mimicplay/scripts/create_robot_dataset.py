@@ -218,7 +218,7 @@ if __name__ == '__main__':
                 
                 
                 # 4. Get the gripper state
-                gripper_q_pos = copy.deepcopy(gripper_state)
+                gripper_q_pos = copy.deepcopy([gripper_state])
 
                 num_future_frame = 10
                 skip_len = 2
@@ -299,7 +299,7 @@ if __name__ == '__main__':
                 hf.create_dataset(obs_path+'/robot0_eye_in_hand_image', data=np.array(gripper_view_list))
                 hf.create_dataset(obs_path+'/robot0_eef_pos', data=np.array(eef_pos_list))
                 hf.create_dataset(obs_path+'/robot0_eef_quat', data=np.array(eef_quat_list))
-                hf.create_dataset(obs_path+'/robot0_gripper_state', data=np.array(gripper_state_list))
+                hf.create_dataset(obs_path+'/robot0_gripper_qpos', data=np.array(gripper_state_list))
                 hf.create_dataset(obs_path+'/robot0_eef_pos_future_traj', data=np.array(robot_future_eef_pos_list))
 
                 hf['data'].attrs['total'] = len(action_list)

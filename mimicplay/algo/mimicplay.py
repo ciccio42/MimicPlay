@@ -22,6 +22,7 @@ from PIL import Image
 from torchvision.transforms import ToTensor
 import numpy as np
 import os
+import random
 
 @register_algo_factory_func("mimicplay")
 def algo_config_to_class(algo_config):
@@ -89,12 +90,12 @@ class Highlevel_GMM_pretrain(BC_Gaussian):
     def load_eval_video_prompt(self, video_path):
         self.prompt = h5py.File(video_path, 'r')
          
-    def perform_test_predictions(self, save_folder, agent_path=None, validation=True, same_video=True):
+    def perform_test_predictions(self, save_folder, agent_path=None, validation=True, same_video=True, sample_goal=True):
 
         if agent_path is not None:
             agent_real = True if 'real' in agent_path else False
         
-        exp_name = f"prompt_real_human_agent_real_{agent_real}"
+        exp_name = f"prompt_real_human_agent_real_{agent_real}_sample_goal_{sample_goal}"
         save_path = os.path.join("..", save_folder,"test/", f"video_{exp_name}")
         os.makedirs(save_path, exist_ok=True)
 
@@ -121,6 +122,7 @@ class Highlevel_GMM_pretrain(BC_Gaussian):
         for demo_key in demo_keys:
 
             # 2. goal
+            goal_image_length = self.prompt['data'][demo_key]['obs']['agentview_image'].shape[0]
             goal_img = self.prompt['data'][demo_key]['obs']['agentview_image'][-1]
             goal_img = ToTensor()(goal_img)#(self._crop_img(goal_img)) #(self._crop_img(goal_img))
             goal['agentview_image'] = goal_img[None, :].to(torch.float32).to(self.device)
@@ -174,6 +176,13 @@ class Highlevel_GMM_pretrain(BC_Gaussian):
                         obs['robot0_eef_pos'] = torch.from_numpy(obs_eef_pos[t][:2])[None, :].to(torch.float32).to(self.device)
                         obs['robot0_eef_pos_future_traj'] = torch.from_numpy(obs_eef_pos_future_traj[t])[None, :].to(torch.float32).to(self.device)
 
+                        if sample_goal:
+                            # overwrite goal with random frame from the goal video
+                            goal_index = min(t + 10, goal_image_length - 1)
+                            goal['agentview_image'] = ToTensor()(self.prompt['data'][demo_key]['obs']['agentview_image'][goal_index])[None, :].to(torch.float32).to(self.device)
+                            goal['robot0_eef_pos'] = torch.from_numpy(self.prompt['data'][demo_key]['obs']['robot0_eef_pos'][goal_index][:2])[None, :].to(torch.float32).to(self.device)
+                            goal['robot0_eef_pos_future_traj'] = torch.from_numpy(self.prompt['data'][demo_key]['obs']['robot0_eef_pos_future_traj'][goal_index])[None, :].to(torch.float32).to(self.device)
+
                         with torch.no_grad():
                             act_out, mlp_feature = self._get_latent_plan(obs, goal)
                             # print("Predicted 3D trajectory: ", act_out)
@@ -193,7 +202,7 @@ class Highlevel_GMM_pretrain(BC_Gaussian):
                             
                             final_img = np.hstack((img, goal_img))
                             pil_img = Image.fromarray(final_img)
-                            pil_img.save(f'prova_pred_all_{t}.png')
+                            pil_img.save(f'prova_pred_all_{t}_goal_indx_{goal_index}.png')
                             video_writer.write(final_img[:,:,::-1])
                     
                     video_writer.release()

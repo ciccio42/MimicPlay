@@ -29,7 +29,8 @@ class PlaydataSequenceDataset(SequenceDataset):
             filter_by_attribute=None,
             load_next_obs=True,
             perform_aug=True,
-            aug_p = 0.5
+            aug_p = 0.5,
+            mix_agent_demo = False
     ):
         """
         Dataset class for fetching sequences of experience.
@@ -151,6 +152,17 @@ class PlaydataSequenceDataset(SequenceDataset):
         self.close_and_delete_hdf5_handle()
         self.perform_aug = perform_aug
         self.aug_p = aug_p
+        self.mix_agent_demo = mix_agent_demo
+        
+        self.task_demo_id_mapping = None
+        if self.mix_agent_demo:
+            # open json file to get task demo_id mapping
+            json_path = hdf5_path.replace('.hdf5', '_task_demo_id_mapping.json')
+            import json
+            with open(json_path, 'r') as f:
+                self.task_demo_id_mapping = json.load(f)
+        else:
+            self.task_demo_id_mapping = None
         
         # open hdf5 file
         robot_dataset_file = h5py.File(self.hdf5_path, "r")
@@ -190,16 +202,16 @@ class PlaydataSequenceDataset(SequenceDataset):
         demo_id = self._index_to_demo_id[index]
         demo_start_index = self._demo_id_to_start_indices[demo_id]
         demo_length = self._demo_id_to_demo_length[demo_id]
-
+            
+            
         demo_indx = int(demo_id.split("_")[-1])
-        human_demo = True if demo_indx < self.start_robot_demo_idx else False
-
-        if human_demo:
-            pass
-            #print(f"Fetching from human demo: {demo_id}")
-        else:
-            pass
-            #print(f"Fetching from robot demo: {demo_id}")
+        # human_demo = True if demo_indx < self.start_robot_demo_idx else False
+        # if human_demo:
+        #     pass
+        #     #print(f"Fetching from human demo: {demo_id}")
+        # else:
+        #     pass
+        #     #print(f"Fetching from robot demo: {demo_id}")
 
         # start at offset index if not padding for frame stacking
         demo_index_offset = 0 if self.pad_frame_stack else (self.n_frame_stack - 1)
@@ -217,12 +229,30 @@ class PlaydataSequenceDataset(SequenceDataset):
             seq_length=self.seq_length
         )
 
-        # determine goal index
-        goal_index = None
-        if self.goal_mode == "nstep":
-            goal_index = min(index_in_demo + random.randint(self.goal_obs_gap[0], self.goal_obs_gap[1]) , demo_length) - 1
-        if self.goal_mode == "last":
-            goal_index = demo_length - 1
+        human_demo = False
+        if self.mix_agent_demo:
+            # get agent task_name
+            task_name = self.hdf5_file['data'][demo_id].attrs['task']
+            # pick random demo_id from robot demos for the same task
+            demonstrator_id = np.random.choice(list(set(self.task_demo_id_mapping[task_name]).intersection(set(self._demo_id_to_demo_length.keys()))))
+            demo_len = self.hdf5_file['data'][demonstrator_id].attrs['num_samples']
+            goal_index = None
+            if self.goal_mode == "nstep":
+                goal_index = min(index_in_demo + random.randint(self.goal_obs_gap[0], self.goal_obs_gap[1]) , demo_len) - 1
+            if self.goal_mode == "last":
+                goal_index = demo_len - 1
+            
+            human_demo = True if int(demonstrator_id.split("_")[-1]) < self.start_robot_demo_idx else False
+                
+        else:
+            # determine goal index
+            goal_index = None
+            if self.goal_mode == "nstep":
+                goal_index = min(index_in_demo + random.randint(self.goal_obs_gap[0], self.goal_obs_gap[1]) , demo_length) - 1
+            if self.goal_mode == "last":
+                goal_index = demo_length - 1
+            
+            human_demo = True if demo_indx < self.start_robot_demo_idx else False
 
         meta["obs"] = self.get_obs_sequence_from_demo(
             demo_id,
@@ -234,27 +264,12 @@ class PlaydataSequenceDataset(SequenceDataset):
         )
         
         # reduce dimension 
-        meta["obs"]["robot0_eef_pos"] = np.reshape(meta["obs"]["robot0_eef_pos"], (1,meta["obs"]["robot0_eef_pos"].shape[-1]))
-        
-        meta["obs"]["robot0_eef_pos_future_traj"] = np.reshape(meta["obs"]["robot0_eef_pos_future_traj"], (1, meta["obs"]["robot0_eef_pos_future_traj"].shape[-1]))
-        
-        meta["actions"] = np.reshape(meta["actions"], (1, meta["actions"].shape[-1]))
-
-        # if not human_demo:
-        #     for key in meta.keys():
-        #         if key != 'obs':
-        #             # set to float32
-        #             meta[key] = np.array(meta[key], dtype=np.float32)
-        #         elif key == 'obs':
-        #             for obs_key in meta['obs'].keys():
-        #                 meta['obs'][obs_key] = np.array(meta['obs'][obs_key], dtype=np.float32)
-        #                 if obs_key == 'robot0_eef_pos' or obs_key == 'robot0_eef_quat':
-        #                     meta['obs'][obs_key] = np.array(meta['obs'][obs_key], dtype=np.float32)
-        
-        # if not human_demo:
-        #     for obs_key in meta['obs'].keys():
-        #         if obs_key == 'robot0_eef_pos' or obs_key == 'robot0_eef_pos_future_traj':
-        #             meta['obs'][obs_key] = np.array([meta['obs'][obs_key]])
+        if len(meta["obs"]["robot0_eef_pos"].shape) == 3:
+            meta["obs"]["robot0_eef_pos"] = np.reshape(meta["obs"]["robot0_eef_pos"], (1,meta["obs"]["robot0_eef_pos"].shape[-1]))
+            
+            meta["obs"]["robot0_eef_pos_future_traj"] = np.reshape(meta["obs"]["robot0_eef_pos_future_traj"], (1, meta["obs"]["robot0_eef_pos_future_traj"].shape[-1]))
+            
+            meta["actions"] = np.reshape(meta["actions"], (1, meta["actions"].shape[-1]))
         
         if self.load_next_obs:
             meta["next_obs"] = self.get_obs_sequence_from_demo(
@@ -274,22 +289,33 @@ class PlaydataSequenceDataset(SequenceDataset):
 
 
         if goal_index is not None:
-            meta["goal_obs"] = self.get_obs_sequence_from_demo(
-                demo_id,
-                index_in_demo=goal_index,
-                keys=self.obs_keys,
-                num_frames_to_stack=self.n_frame_stack - 1,
-                seq_length=self.seq_length,
-                prefix="obs",
-            )
+            if not self.mix_agent_demo:
+                meta["goal_obs"] = self.get_obs_sequence_from_demo(
+                    demo_id,
+                    index_in_demo=goal_index,
+                    keys=self.obs_keys,
+                    num_frames_to_stack=self.n_frame_stack - 1,
+                    seq_length=self.seq_length,
+                    prefix="obs",
+                )
+            elif self.mix_agent_demo:
+                meta["goal_obs"] = self.get_obs_sequence_from_demo(
+                    demonstrator_id,
+                    index_in_demo=goal_index,
+                    keys=self.obs_keys,
+                    num_frames_to_stack=self.n_frame_stack - 1,
+                    seq_length=self.seq_length,
+                    prefix="obs",
+                )
             # if not human_demo:
             #     for obs_key in meta['goal_obs'].keys():
             #         if obs_key == 'robot0_eef_pos' or obs_key == 'robot0_eef_pos_future_traj':
             #             meta['goal_obs'][obs_key] = np.array([meta['goal_obs'][obs_key]])
         
             # reduce dimension 
-            meta["goal_obs"]["robot0_eef_pos"] = np.reshape(meta["goal_obs"]["robot0_eef_pos"], (1, meta["goal_obs"]["robot0_eef_pos"].shape[-1]))
-            meta["goal_obs"]["robot0_eef_pos_future_traj"] = np.reshape(meta["goal_obs"]["robot0_eef_pos_future_traj"], (1, meta["goal_obs"]["robot0_eef_pos_future_traj"].shape[-1]))
+            if len(meta["goal_obs"]["robot0_eef_pos"].shape) == 3:
+                meta["goal_obs"]["robot0_eef_pos"] = np.reshape(meta["goal_obs"]["robot0_eef_pos"], (1, meta["goal_obs"]["robot0_eef_pos"].shape[-1]))
+                meta["goal_obs"]["robot0_eef_pos_future_traj"] = np.reshape(meta["goal_obs"]["robot0_eef_pos_future_traj"], (1, meta["goal_obs"]["robot0_eef_pos_future_traj"].shape[-1]))
         
         aug = np.random.choice([1, 0], p=[self.aug_p, 1-self.aug_p])
         if human_demo and aug and self.perform_aug:
