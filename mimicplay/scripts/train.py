@@ -380,9 +380,9 @@ def main(args):
 
 if __name__ == "__main__":
     
-    debugpy.listen(("localhost", 5678))
-    print("Waiting for debugger attach...")
-    debugpy.wait_for_client()
+    # debugpy.listen(("localhost", 5678))
+    # print("Waiting for debugger attach...")
+    # debugpy.wait_for_client()
 
     parser = argparse.ArgumentParser()
 

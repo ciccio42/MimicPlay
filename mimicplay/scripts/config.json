@@ -1,0 +1,39 @@
+{
+    "num_view": 1,
+    "robot_keys": {
+        "keys": [
+            "actions",
+            "dones",
+            "rewards"
+        ],
+        "obs_keys": [
+            "agentview_image",
+            "robot0_eef_pos_3d_camera",
+            "robot0_eef_pos_future_traj",
+            "robot0_eef_pos_px"
+        ],
+        "remap_keys": {
+            "robot0_eef_pos_3d_camera": "robot0_eef_pos_3D_0",
+            "robot0_eef_pos_px": "robot0_eef_pos"
+        }
+    },
+    "human_keys": {
+        "action_inds": [
+            0,
+            2
+        ],
+        "keys": [
+            "actions",
+            "dones",
+            "rewards"
+        ],
+        "obs_keys": [
+            "agentview_image",
+            "hand_act_0",
+            "hand_loc_0",
+            "robot0_eef_pos",
+            "robot0_eef_pos_3D_0",
+            "robot0_eef_pos_future_traj"
+        ]
+    }
+}

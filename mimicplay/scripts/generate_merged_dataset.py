@@ -11,10 +11,11 @@ import numpy as np
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Generate human dataset')
-    parser.add_argument('--task_folder', default="/user/frosa/multi_task_lfd/ur_multitask_dataset/pick_place/real_new_ur5e_pick_place/hdf5_files/", type=str, help='Path to the task folder')
-    parser.add_argument('--output_folder', default="/user/frosa/multi_task_lfd/ur_multitask_dataset/pick_place/real_new_ur5e_pick_place/hdf5_files/merged_dataset", type=str, help='Path to the output folder')
+    parser.add_argument('--task_folder', default="/user/frosa/multi_task_lfd/ur_multitask_dataset/pick_place/ur5e_pick_place/hdf5_files/", type=str, help='Path to the task folder')
+    parser.add_argument('--output_folder', default="/user/frosa/multi_task_lfd/ur_multitask_dataset/pick_place/ur5e_pick_place/hdf5_files/merged_dataset", type=str, help='Path to the output folder')
     parser.add_argument('--robot_name', default="provola", type=str, help='Name of the robot')
     parser.add_argument('--dataset_type', default="all_demos", type=str, help='Type of dataset to generate')
+    parser.add_argument('--config_path', default="scripts/config.json", type=str, help='Path to the config file')
     parser.add_argument('--debug', action='store_true', help='Enable debug mode')
     
     args = parser.parse_args()
@@ -31,6 +32,8 @@ if __name__ == '__main__':
     os.makedirs(args.output_folder, exist_ok=True)
     new_fout = h5py.File(os.path.join(args.output_folder, f"{args.robot_name}_{args.dataset_type}.hdf5"), "w")
     
+    with open(args.config_path, 'r') as f:
+        config = json.load(f)
     
     task_folders = glob.glob(os.path.join(args.task_folder, "task_*"))
     task_folders = sorted(task_folders, key=lambda x: int(x.split("_")[-1]))
@@ -80,12 +83,12 @@ if __name__ == '__main__':
                             new_fout.create_dataset(f"data/demo_{demo_number}/{key}", data=demo_0[key][...])
                     else:
                         for subkey in demo_0[key].keys():
-                            if '_0' in subkey:
-                                new_subkey = subkey.replace('_0', f"_{demo_number}")
-                            else:
-                                new_subkey = subkey
-                                
-                            if subkey != "agentview_image" and subkey != 'front_image_0':
+                            # if '_0' in subkey:
+                            #     new_subkey = subkey.replace('_0', f"_{demo_number}")
+                            # else:
+                            #     new_subkey = subkey
+                            new_subkey = subkey
+                            if "image" not in subkey:
                                 print(f"\tSubkey: {subkey}")
                                 
                                 if len(demo_0[key][subkey].shape) == 2:
@@ -93,8 +96,8 @@ if __name__ == '__main__':
                                 else:
                                     new_fout.create_dataset(f"data/demo_{demo_number}/{key}/{new_subkey}", data=demo_0[key][subkey][...])
                                     
-                            elif subkey == "agentview_image" or subkey == 'front_image_0':
-                                print(f"\tSubkey: {subkey}")
+                            elif "image" in subkey:
+                                print(f"\tImage Subkey: {subkey}")
                                 images = []
                                 for t, img in enumerate(demo_0[key][subkey]):
                                     if img.shape[:2] != (120, 120):

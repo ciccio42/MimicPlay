@@ -116,16 +116,22 @@ def load_data_for_training(config, obs_keys):
         )
         assert set(train_demo_keys).isdisjoint(set(valid_demo_keys)), "training demonstrations overlap with " \
             "validation demonstrations!"
-        train_dataset = dataset_factory(config, obs_keys, filter_by_attribute=train_filter_by_attribute)
-        valid_dataset = dataset_factory(config, obs_keys, filter_by_attribute=valid_filter_by_attribute)
+        train_dataset = dataset_factory(config, 
+                                        obs_keys, 
+                                        filter_by_attribute=train_filter_by_attribute,
+                                        train=True)
+        valid_dataset = dataset_factory(config, 
+                                        obs_keys, 
+                                        filter_by_attribute=valid_filter_by_attribute, 
+                                        train=False)
     else:
-        train_dataset = dataset_factory(config, obs_keys, filter_by_attribute=train_filter_by_attribute)
+        train_dataset = dataset_factory(config, obs_keys, filter_by_attribute=train_filter_by_attribute, train=True)
         valid_dataset = None
 
     return train_dataset, valid_dataset
 
 
-def dataset_factory(config, obs_keys, filter_by_attribute=None, dataset_path=None):
+def dataset_factory(config, obs_keys, filter_by_attribute=None, dataset_path=None, train=True):
     """
     Create a PlaydataSequenceDataset instance to pass to a torch DataLoader.
 
@@ -163,7 +169,9 @@ def dataset_factory(config, obs_keys, filter_by_attribute=None, dataset_path=Non
         hdf5_use_swmr=config.train.hdf5_use_swmr,
         hdf5_normalize_obs=config.train.hdf5_normalize_obs,
         filter_by_attribute=filter_by_attribute,
-        mix_agent_demo =config.train.mix_agent_demo
+        mix_agent_demo =config.train.mix_agent_demo,
+        demo_path = config.train.demo_path,
+        train = train,
     )
     dataset = PlaydataSequenceDataset(**ds_kwargs)
 

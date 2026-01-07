@@ -35,8 +35,8 @@
     },
     "train": {
         "data": null,
-        "output_dir": "../trained_models_highlevel_human_panda_pick_place_all_demos_augmented_goal_intermediate_mix_agent_demo",
-        "num_data_workers": 16,
+        "output_dir": "../trained_models_highlevel_human_panda_3D_state",
+        "num_data_workers": 8,
         "hdf5_cache_mode": null,
         "hdf5_use_swmr": true,
         "hdf5_normalize_obs": false,
@@ -173,7 +173,7 @@
         "modalities": {
             "obs": {
                 "low_dim": [
-                    "robot0_eef_pos",
+                    "robot0_eef_pos_3D_0",
                     "robot0_eef_pos_future_traj"
                 ],
                 "rgb": [

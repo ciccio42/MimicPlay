@@ -2,8 +2,8 @@
 *.egg-info
 
 datasets/
-trained_models_*
-
+*trained_models_*
+scripts/human_playdata_process/hand_object_detector
 *.mp4
 *.avi
 mimicplay/*png
@@ -11,3 +11,5 @@ events.*
 model_epoch*
 log*
 *txt
+mimicplay/.nfs0000000044ae893d0000087b
+*png

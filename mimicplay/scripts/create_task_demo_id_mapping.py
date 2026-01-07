@@ -15,7 +15,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--file_path', 
                         type=str, 
-                        default='/user/frosa/multi_task_lfd/datasets/pick_place/human_rgb_pick_place/hdf5/merged_dataset/human_panda_robot_merged.hdf5',
+                        default='/user/frosa/multi_task_lfd/ur_multitask_dataset/pick_place/human_dataset/hdf5/merged_dataset/human_panda_robot_merged.hdf5',
                         help='Directory containing the raw data files.')    
     
     args = parser.parse_args()

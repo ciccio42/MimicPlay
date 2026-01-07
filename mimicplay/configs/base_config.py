@@ -197,6 +197,7 @@ class BaseConfig(Config):
         self.train.seed = 1             # seed for training (for reproducibility)
         
         self.train.mix_agent_demo = False  # whether to mix agent and human demos during training
+        self.train.demo_path = None       # path to demonstration dataset, to be used when training low-level policies with human demos
 
     def algo_config(self):
         """

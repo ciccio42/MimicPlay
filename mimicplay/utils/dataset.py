@@ -9,6 +9,7 @@ from PIL import Image
 import copy 
 import cv2
 import h5py
+import json
 
 class PlaydataSequenceDataset(SequenceDataset):
     def __init__(
@@ -30,7 +31,9 @@ class PlaydataSequenceDataset(SequenceDataset):
             load_next_obs=True,
             perform_aug=True,
             aug_p = 0.5,
-            mix_agent_demo = False
+            mix_agent_demo = False,
+            demo_path=None,
+            train=True
     ):
         """
         Dataset class for fetching sequences of experience.
@@ -158,7 +161,6 @@ class PlaydataSequenceDataset(SequenceDataset):
         if self.mix_agent_demo:
             # open json file to get task demo_id mapping
             json_path = hdf5_path.replace('.hdf5', '_task_demo_id_mapping.json')
-            import json
             with open(json_path, 'r') as f:
                 self.task_demo_id_mapping = json.load(f)
         else:
@@ -172,26 +174,77 @@ class PlaydataSequenceDataset(SequenceDataset):
         except:
             self.start_robot_demo_idx = -1
         robot_dataset_file.close()
+        
+        # path to demonstration dataset
+        self.demo_path = demo_path
+        if self.demo_path is not None:
+            self.demo_dataset = h5py.File(self.demo_path, "r")
+            
+            # open json file to get task demo_id mapping for demonstration dataset
+            json_path = self.demo_path.replace('.hdf5', '_low_level_human_demo_task_demo_id_mapping.json')
+            with open(json_path, 'r') as f:
+                self.demo_task_demo_id_mapping = json.load(f)
+        self.train = train
+            
 
-    def recolor_arm(self, img, color, new_color):
+    def recolor_arm(self, img_seq, color, new_color):
         # pil_img = Image.fromarray(img)
         # pil_img.save("original_img.png")
         
-        new_img = copy.deepcopy(img)
-        mask_img = new_img<=color
-        mask_img = np.sum(mask_img, axis=2)==3
-        mask_img[:, :30] = False        
-        mask_img[:, 100:] = False
+        new_img_seq = copy.deepcopy(img_seq)
+        
+        mask_img = new_img_seq<=color
+        mask_img = np.sum(mask_img, axis=3)==3
+        mask_img[:, :, :30] = False        
+        mask_img[:, :, 100:] = False
         # erosion to remove isolated points
         mask_img = np.array(cv2.erode(np.array(mask_img, np.uint8), np.ones((3,3), np.uint8)), np.bool)
         
-                               
-        new_img[mask_img, :]=new_color
+                            
+        new_img_seq[mask_img, :]=new_color
         # pil_img = Image.fromarray(new_img)
         # pil_img.save("new_img.png")
         
-        return new_img
+        return new_img_seq
         
+    def get_sequence_from_human_demo(self, demo_id, index_in_demo, keys, num_frames_to_stack=0, seq_length=1, prefix="obs"):
+        
+        assert num_frames_to_stack >= 0
+        assert seq_length >= 1
+
+        demo_length = self.demo_dataset['data'][demo_id].attrs['num_samples']
+        assert index_in_demo < demo_length, "index_in_demo {} out of range for demo_length {}".format(index_in_demo, demo_length)
+
+        # determine begin and end of sequence
+        seq_begin_index = max(0, index_in_demo - num_frames_to_stack)
+        seq_end_index = min(demo_length, index_in_demo + seq_length)
+
+        # determine sequence padding
+        seq_begin_pad = max(0, num_frames_to_stack - index_in_demo)  # pad for frame stacking
+        seq_end_pad = max(0, index_in_demo + seq_length - demo_length)  # pad for sequence length
+
+        # make sure we are not padding if specified.
+        if not self.pad_frame_stack:
+            assert seq_begin_pad == 0
+        if not self.pad_seq_length:
+            assert seq_end_pad == 0
+
+        # fetch observation from the dataset file
+        seq = dict()
+        for k in keys:
+            k_with_prefix = f"{prefix}/{k}"
+            data = self.demo_dataset['data'][demo_id][k_with_prefix]
+            seq[k_with_prefix] = data[seq_begin_index: seq_end_index]
+
+        seq = TensorUtils.pad_sequence(seq, padding=(seq_begin_pad, seq_end_pad), pad_same=True)
+        pad_mask = np.array([0] * seq_begin_pad + [1] * (seq_end_index - seq_begin_index) + [0] * seq_end_pad)
+        pad_mask = pad_mask[:, None].astype(bool)
+
+        obs = {k.split('/')[1]: seq[k] for k in seq}  # strip the prefix
+        if self.get_pad_mask:
+            obs["pad_mask"] = pad_mask
+
+        return obs
         
 
     def get_item(self, index):
@@ -229,6 +282,14 @@ class PlaydataSequenceDataset(SequenceDataset):
             seq_length=self.seq_length
         )
 
+        if 'actions_robot' in meta.keys() and meta['actions_robot'].shape[0] <= self.seq_length:
+            # pad actions_robot to have at least seq_length
+            pad_len = self.seq_length - meta['actions_robot'].shape[0] 
+            # add zero actions_robot at the end
+            actions_robot_pad = np.zeros((pad_len, meta['actions_robot'].shape[1]))
+            meta['actions_robot'] = np.concatenate([meta['actions_robot'], actions_robot_pad], axis=0)
+            
+        
         human_demo = False
         if self.mix_agent_demo:
             # get agent task_name
@@ -245,14 +306,30 @@ class PlaydataSequenceDataset(SequenceDataset):
             human_demo = True if int(demonstrator_id.split("_")[-1]) < self.start_robot_demo_idx else False
                 
         else:
-            # determine goal index
-            goal_index = None
-            if self.goal_mode == "nstep":
-                goal_index = min(index_in_demo + random.randint(self.goal_obs_gap[0], self.goal_obs_gap[1]) , demo_length) - 1
-            if self.goal_mode == "last":
-                goal_index = demo_length - 1
-            
-            human_demo = True if demo_indx < self.start_robot_demo_idx else False
+            # used when training high-level policies or low-level policies without mixing demos
+            if self.demo_path is None:
+                # determine goal index
+                goal_index = None
+                if self.goal_mode == "nstep":
+                    goal_index = min(index_in_demo + random.randint(self.goal_obs_gap[0], self.goal_obs_gap[1]) , demo_length) - 1
+                if self.goal_mode == "last":
+                    goal_index = demo_length - 1
+                
+                human_demo = True if demo_indx < self.start_robot_demo_idx else False
+            else:
+                # get task_name from agent
+                task_name = self.hdf5_file['data'][demo_id].attrs['task']
+                # pick random demo_id from human demos for the same task
+                split_key = 'train' if self.train else 'val'
+                demonstrator_id = np.random.choice(self.demo_task_demo_id_mapping[split_key][task_name])
+                demo_len = self.demo_dataset['data'][demonstrator_id].attrs['num_samples']
+                goal_index = None
+                if self.goal_mode == "nstep":
+                    goal_index = min(index_in_demo + random.randint(self.goal_obs_gap[0], self.goal_obs_gap[1]) , demo_len) - 1
+                if self.goal_mode == "last":
+                    goal_index = demo_len - 1
+                human_demo = True
+                
 
         meta["obs"] = self.get_obs_sequence_from_demo(
             demo_id,
@@ -264,12 +341,21 @@ class PlaydataSequenceDataset(SequenceDataset):
         )
         
         # reduce dimension 
-        if len(meta["obs"]["robot0_eef_pos"].shape) == 3:
-            meta["obs"]["robot0_eef_pos"] = np.reshape(meta["obs"]["robot0_eef_pos"], (1,meta["obs"]["robot0_eef_pos"].shape[-1]))
+        for key in meta["obs"].keys():
+            if 'robot0_eef_pos' in key:
+                state_key = key
+                break
             
-            meta["obs"]["robot0_eef_pos_future_traj"] = np.reshape(meta["obs"]["robot0_eef_pos_future_traj"], (1, meta["obs"]["robot0_eef_pos_future_traj"].shape[-1]))
+        # check if state contains inf values
+        if np.any(np.isinf(meta["obs"][state_key])):
+            print(f"Found inf values in demo {demo_id} at index {index_in_demo}")
+            print(meta["obs"][state_key])
             
-            meta["actions"] = np.reshape(meta["actions"], (1, meta["actions"].shape[-1]))
+            
+        if len(meta["obs"][state_key].shape) == 3:
+            for key in meta["obs"].keys():
+                if 'agentview_image' not in key and 'robot0_eye_in_hand_image' not in key:
+                    meta["obs"][key] = np.reshape(meta["obs"][key], (meta["obs"][key].shape[0], meta["obs"][key].shape[-1]))
         
         if self.load_next_obs:
             meta["next_obs"] = self.get_obs_sequence_from_demo(
@@ -289,7 +375,7 @@ class PlaydataSequenceDataset(SequenceDataset):
 
 
         if goal_index is not None:
-            if not self.mix_agent_demo:
+            if not self.mix_agent_demo and self.demo_path is None:
                 meta["goal_obs"] = self.get_obs_sequence_from_demo(
                     demo_id,
                     index_in_demo=goal_index,
@@ -298,7 +384,7 @@ class PlaydataSequenceDataset(SequenceDataset):
                     seq_length=self.seq_length,
                     prefix="obs",
                 )
-            elif self.mix_agent_demo:
+            elif self.mix_agent_demo and self.demo_path is None:
                 meta["goal_obs"] = self.get_obs_sequence_from_demo(
                     demonstrator_id,
                     index_in_demo=goal_index,
@@ -307,31 +393,51 @@ class PlaydataSequenceDataset(SequenceDataset):
                     seq_length=self.seq_length,
                     prefix="obs",
                 )
-            # if not human_demo:
-            #     for obs_key in meta['goal_obs'].keys():
-            #         if obs_key == 'robot0_eef_pos' or obs_key == 'robot0_eef_pos_future_traj':
-            #             meta['goal_obs'][obs_key] = np.array([meta['goal_obs'][obs_key]])
+            elif not self.mix_agent_demo and self.demo_path is not None:
+                meta["goal_obs"] = self.get_sequence_from_human_demo(
+                    demonstrator_id,
+                    index_in_demo=goal_index,
+                    keys=['agentview_image', 'robot0_eef_pos'],
+                    num_frames_to_stack=self.n_frame_stack - 1,
+                    seq_length=self.seq_length,
+                    prefix="obs"
+                )
+                
         
             # reduce dimension 
-            if len(meta["goal_obs"]["robot0_eef_pos"].shape) == 3:
-                meta["goal_obs"]["robot0_eef_pos"] = np.reshape(meta["goal_obs"]["robot0_eef_pos"], (1, meta["goal_obs"]["robot0_eef_pos"].shape[-1]))
-                meta["goal_obs"]["robot0_eef_pos_future_traj"] = np.reshape(meta["goal_obs"]["robot0_eef_pos_future_traj"], (1, meta["goal_obs"]["robot0_eef_pos_future_traj"].shape[-1]))
+            if len(meta["goal_obs"][state_key].shape) == 3:
+                
+                for key in meta["goal_obs"].keys():
+                    if 'agentview_image' not in key and 'robot0_eye_in_hand_image' not in key:
+                        meta["goal_obs"][key] = np.reshape(meta["goal_obs"][key], (meta["goal_obs"][key].shape[0], meta["goal_obs"][key].shape[-1]))
+                
+                
         
         aug = np.random.choice([1, 0], p=[self.aug_p, 1-self.aug_p])
         if human_demo and aug and self.perform_aug:
             # pick color for arm
             arm_color = [40,40,40]
             new_arm_color = np.random.randint(0, 255, size=3).tolist()
-            meta["obs"]["agentview_image"] = self.recolor_arm(meta["obs"]["agentview_image"][0], 
-                                                              color=arm_color,
-                                                              new_color=new_arm_color)[None]
+            if not self.mix_agent_demo and self.demo_path is None:
+                # training high-level policies with human demos only
+                meta["obs"]["agentview_image"] = self.recolor_arm(
+                                                                meta["obs"]["agentview_image"][0], 
+                                                                color=arm_color,
+                                                                new_color=new_arm_color)[None]
             if "next_obs" in meta.keys():
-                meta["next_obs"]["agentview_image"] = self.recolor_arm(meta["next_obs"]["agentview_image"][0], 
-                                                              color=arm_color,
-                                                              new_color=new_arm_color)[None]
+                meta["next_obs"]["agentview_image"] = self.recolor_arm(
+                                                                meta["next_obs"]["agentview_image"][0], 
+                                                                color=arm_color,
+                                                                new_color=new_arm_color)[None]
             if "goal_obs" in meta.keys():
-                meta["goal_obs"]["agentview_image"] = self.recolor_arm(meta["goal_obs"]["agentview_image"][0], 
-                                                              color=arm_color,
-                                                              new_color=new_arm_color)[None]
+                meta["goal_obs"]["agentview_image"] = self.recolor_arm(
+                                                                meta["goal_obs"]["agentview_image"], 
+                                                                color=arm_color,
+                                                                new_color=new_arm_color)
+                
+        # replace actions_robot key with actions key
+        if "actions_robot" in meta.keys():
+            meta["actions"] = meta["actions_robot"]
+            del meta["actions_robot"]
                 
         return meta

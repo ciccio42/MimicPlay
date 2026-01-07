@@ -90,7 +90,9 @@ class Highlevel_GMM_pretrain(BC_Gaussian):
     def load_eval_video_prompt(self, video_path):
         self.prompt = h5py.File(video_path, 'r')
          
-    def perform_test_predictions(self, save_folder, agent_path=None, validation=True, same_video=True, sample_goal=True):
+    def perform_test_predictions(self, save_folder, agent_path=None, validation=True, same_video=True, sample_goal=True, cfg=None):
+
+        assert cfg is not None, "cfg must be provided for agent and demo keys"
 
         if agent_path is not None:
             agent_real = True if 'real' in agent_path else False
@@ -120,21 +122,29 @@ class Highlevel_GMM_pretrain(BC_Gaussian):
             agent_keys = self.agent['mask']['valid'] if validation else self.agent['mask']['train']
         
         for demo_key in demo_keys:
-
-            # 2. goal
-            goal_image_length = self.prompt['data'][demo_key]['obs']['agentview_image'].shape[0]
-            goal_img = self.prompt['data'][demo_key]['obs']['agentview_image'][-1]
-            goal_img = ToTensor()(goal_img)#(self._crop_img(goal_img)) #(self._crop_img(goal_img))
-            goal['agentview_image'] = goal_img[None, :].to(torch.float32).to(self.device)
-            goal['robot0_eef_pos'] = torch.from_numpy(self.prompt['data'][demo_key]['obs']['robot0_eef_pos'][-1])[None, :].to(torch.float32).to(self.device)
-            goal['robot0_eef_pos_future_traj'] = torch.from_numpy(self.prompt['data'][demo_key]['obs']['robot0_eef_pos_future_traj'][-1])[None, :].to(torch.float32).to(self.device)
+            
+            demo_obs_keys = cfg['demo_obs_keys']
+            for demo_obs_key in demo_obs_keys:
+                # goal
+                if 'image' in demo_obs_key:
+                    goal_image_length = self.prompt['data'][demo_key]['obs'][demo_obs_key].shape[0]
+                    goal_img = self.prompt['data'][demo_key]['obs'][demo_obs_key][-1]
+                    goal_img = ToTensor()(goal_img)#(self._crop_img(goal_img)) #(self._crop_img(goal_img))
+                    demo_obs = goal_img[None, :].to(torch.float32).to(self.device)
+                else:
+                    if 'future_traj' not in demo_obs_key:
+                        demo_obs = torch.from_numpy(self.prompt['data'][demo_key]['obs'][demo_obs_key][-1,:, :3])[None, :].to(torch.float32).to(self.device)
+                    else:
+                        demo_obs = torch.from_numpy(self.prompt['data'][demo_key]['obs'][demo_obs_key][-1]).to(torch.float32).to(self.device)
+                
+                goal[demo_obs_key] = demo_obs
             
             # check if demo and agent are the same task
-            if agent_path is not None:
-                task_agent = agent_path.split('/')[-2]
-                if self.prompt['data'][demo_key].attrs['task'] != task_agent:
-                    print(f"Warning: demo {demo_key.decode()} and agent_path {agent_path} are not the same task!")
-                    agent_path = agent_path.replace(task_agent, self.prompt['data'][demo_key].attrs['task'])
+            # if agent_path is not None:
+            #     task_agent = agent_path.split('/')[-5]
+            #     if self.prompt['data'][demo_key].attrs['task'] != task_agent:
+            #         print(f"Warning: demo {demo_key.decode()} and agent_path {agent_path} are not the same task!")
+            #         agent_path = agent_path.replace(task_agent, self.prompt['data'][demo_key].attrs['task'])
             
             for agent_key in agent_keys:
                 task_agent = self.agent['data'][agent_key].attrs['task']
@@ -144,19 +154,7 @@ class Highlevel_GMM_pretrain(BC_Gaussian):
                 #     continue
                 # elif same_video and agent_key == demo_key and self.prompt['data'][demo_key].attrs['task'] == self.prompt['data'][agent_key].attrs['task']:
                 if self.prompt['data'][demo_key].attrs['task'] == self.agent['data'][agent_key].attrs['task']:
-                    if agent_path is not None:
-                        # take observations from the agent file
-                        obs_traj_len = len(self.agent['data'][agent_key]['obs']['agentview_image'])
-                        obs_imgs = self.agent['data'][agent_key]['obs']['agentview_image']
-                        obs_eef_pos = self.agent['data'][agent_key]['obs']['robot0_eef_pos']
-                        obs_eef_pos_future_traj = self.agent['data'][agent_key]['obs']['robot0_eef_pos_future_traj']
-                    else:
-                        obs_traj_len = len(self.prompt['data'][agent_key]['obs']['agentview_image'])
-                        obs_imgs = self.prompt['data'][agent_key]['obs']['agentview_image']
-                        obs_eef_pos = self.prompt['data'][agent_key]['obs']['robot0_eef_pos']
-                        obs_eef_pos_future_traj = self.prompt['data'][agent_key]['obs']['robot0_eef_pos_future_traj']
                     
-
                     if agent_path is not None:
                         # agent_task = agent_path.split('/')[-2]
                         video_save_path = os.path.join(save_path, f'pred_task_{task_agent}_agent_{agent_key.decode()}_demo_{demo_key.decode()}.mp4')
@@ -164,25 +162,59 @@ class Highlevel_GMM_pretrain(BC_Gaussian):
                         video_save_path = os.path.join(save_path, f'pred_task_{task_agent}_agent_{agent_key.decode()}_demo_{demo_key.decode()}.mp4')
 
                     video_writer  = cv2.VideoWriter(video_save_path, fourcc, 10.0, (2*120, 120))
-
+                    
+                    
+                    obs_img_key = None
+                    for key in cfg['agent_obs_keys']:
+                        if 'image' in key:
+                            obs_img_key = key
+                            break
+                    if agent_path is not None:
+                        obs_traj_len = self.agent['data'][agent_key]['obs'][obs_img_key].shape[0]
+                        obs_data = self.agent['data'][agent_key]
+                    else:
+                        obs_traj_len = self.prompt['data'][agent_key]['obs'][obs_img_key].shape[0]
+                        obs_data = self.prompt['data'][agent_key]
+                    
                     for t in range(obs_traj_len):
-                        # 1. obs
-                        img = obs_imgs[t]
-                        if img.shape[0] != 120 or img.shape[1] != 120:
-                            img = ToTensor()(self._crop_img(img))
-                        else:
-                            img = ToTensor()(img)
-                        obs['agentview_image'] = img[None, :].to(torch.float32).to(self.device)
-                        obs['robot0_eef_pos'] = torch.from_numpy(obs_eef_pos[t][:2])[None, :].to(torch.float32).to(self.device)
-                        obs['robot0_eef_pos_future_traj'] = torch.from_numpy(obs_eef_pos_future_traj[t])[None, :].to(torch.float32).to(self.device)
+                        
+                        obs = dict()
+                        for key in cfg['agent_obs_keys']:
+                            if 'image' in key:
+                                agent_img = obs_data['obs'][key][t]
+                                if agent_img.shape[0] != 120 or agent_img.shape[1] != 120:
+                                    agent_img = ToTensor()(self._crop_img(agent_img))
+                                else:
+                                    agent_img = ToTensor()(agent_img)
+                                obs[key] = agent_img[None, :].to(torch.float32).to(self.device)
+                        
+                            else:
+                                if 'future_traj' not in key:
+                                    agent_obs = obs_data['obs'][key][t]
+                                    if key == 'robot0_eef_pos_3d_camera':
+                                        new_key = "robot0_eef_pos_3D_0"
+                                    obs[new_key] = torch.from_numpy(agent_obs[:3])[None, :].to(torch.float32).to(self.device)
+                                else:
+                                    agent_obs = obs_data['obs'][key][t]
+                                    obs[key] = torch.from_numpy(agent_obs).to(torch.float32).to(self.device)
+    
 
                         if sample_goal:
                             # overwrite goal with random frame from the goal video
                             goal_index = min(t + 10, goal_image_length - 1)
-                            goal['agentview_image'] = ToTensor()(self.prompt['data'][demo_key]['obs']['agentview_image'][goal_index])[None, :].to(torch.float32).to(self.device)
-                            goal['robot0_eef_pos'] = torch.from_numpy(self.prompt['data'][demo_key]['obs']['robot0_eef_pos'][goal_index][:2])[None, :].to(torch.float32).to(self.device)
-                            goal['robot0_eef_pos_future_traj'] = torch.from_numpy(self.prompt['data'][demo_key]['obs']['robot0_eef_pos_future_traj'][goal_index])[None, :].to(torch.float32).to(self.device)
-
+                            
+                            for demo_obs_key in cfg['demo_obs_keys']:
+                                if 'image' in demo_obs_key:
+                                    goal_img = self.prompt['data'][demo_key]['obs'][demo_obs_key][goal_index]
+                                    goal_img = ToTensor()(goal_img)
+                                    goal[demo_obs_key] = goal_img[None, :].to(torch.float32).to(self.device)
+                                else:
+                                    if 'future_traj' not in demo_obs_key:
+                                        goal[demo_obs_key] = torch.from_numpy(self.prompt['data'][demo_key]['obs'][demo_obs_key][goal_index][:3])[None, :].to(torch.float32).to(self.device)
+                                    else:
+                                        goal[demo_obs_key] = torch.from_numpy(self.prompt['data'][demo_key]['obs'][demo_obs_key][goal_index])[None, :].to(torch.float32).to(self.device)
+                            
+                
                         with torch.no_grad():
                             act_out, mlp_feature = self._get_latent_plan(obs, goal)
                             # print("Predicted 3D trajectory: ", act_out)
@@ -202,7 +234,8 @@ class Highlevel_GMM_pretrain(BC_Gaussian):
                             
                             final_img = np.hstack((img, goal_img))
                             pil_img = Image.fromarray(final_img)
-                            pil_img.save(f'prova_pred_all_{t}_goal_indx_{goal_index}.png')
+                            os.makedirs('test_outputs', exist_ok=True)
+                            pil_img.save(f'test_outputs/prova_pred_all_{t}_goal_indx_{goal_index}.png')
                             video_writer.write(final_img[:,:,::-1])
                     
                     video_writer.release()

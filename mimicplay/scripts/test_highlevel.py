@@ -98,10 +98,16 @@ def test(config, args, device):
     # load task video prompt
     model.policy.load_eval_video_prompt(args.video_prompt)
 
+    obs_keys = {
+        "demo_obs_keys": ["agentview_image", "robot0_eef_pos_3D_0", "robot0_eef_pos_future_traj"],
+        "agent_obs_keys": ["agentview_image", "robot0_eef_pos_3d_camera", "robot0_eef_pos_future_traj"]
+    }
+
     model.policy.perform_test_predictions(save_folder=config.train.output_dir, 
                                           validation=True,
                                           agent_path=args.agent_path,
-                                          sample_goal=True if 'intermediate' in config.train.output_dir else False)
+                                          sample_goal=True if 'intermediate' in config.train.output_dir else False,
+                                          cfg=obs_keys)
     
 
 def main(args):
