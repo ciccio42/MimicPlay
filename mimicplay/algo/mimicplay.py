@@ -305,9 +305,12 @@ class Highlevel_GMM_pretrain(BC_Gaussian):
             for item in ['agentview_image']:
                 obs[item] = obs[item].view(bs * seq, c, h, w)
                 goal[item] = goal[item].view(bs * seq, c, h, w)
-
-            obs['robot0_eef_pos'] = obs['robot0_eef_pos'].view(bs * seq, 3)
-
+            
+          
+            for key in obs.keys():
+                if 'robot0_eef_pos' in key:
+                    obs[key] = obs[key].view(bs * seq, 3)
+                    
             dists, enc_out, mlp_out = self.nets["policy"].forward_train(
                 obs_dict=obs,
                 goal_dict=goal,
@@ -316,12 +319,14 @@ class Highlevel_GMM_pretrain(BC_Gaussian):
 
             act_out_all = dists.mean
             act_out = act_out_all
-
+            
             for item in ['agentview_image']:
                 obs[item] = obs[item].view(bs, seq, c, h, w)
                 goal[item] = goal[item].view(bs, seq, c, h, w)
 
-            obs['robot0_eef_pos'] = obs['robot0_eef_pos'].view(bs, seq, 3)
+            for key in obs.keys():
+                if 'robot0_eef_pos' in key:
+                    obs[key] = obs[key].view(bs, seq, 3)
 
             enc_out_feature_size = enc_out.size()[1]
             mlp_out_feature_size = mlp_out.size()[1]

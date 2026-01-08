@@ -36,14 +36,14 @@
     "train": {
         "data": null,
         "output_dir": "../trained_models_lowlevel_ur5e_agent_human_demo",
-        "num_data_workers": 1,
+        "num_data_workers": 16,
         "hdf5_cache_mode": "low_dim",
         "hdf5_use_swmr": true,
         "hdf5_normalize_obs": false,
         "hdf5_load_next_obs": false,
         "hdf5_filter_key": "train",
         "hdf5_validation_filter_key": "valid",
-        "seq_length": 10,
+        "seq_length": 1,
         "dataset_keys": [
             "actions_robot",
             "rewards",
@@ -54,7 +54,7 @@
         "batch_size": 32,
         "num_epochs": 3000,
         "seed": 1,
-        "demo_path": "/user/frosa/multi_task_lfd/datasets/pick_place/human_rgb_pick_place/hdf5/merged_dataset/human_pick_place_all_demos.hdf5"
+        "demo_path": "/user/frosa/multi_task_lfd/ur_multitask_dataset/pick_place/human_dataset/hdf5/merged_dataset/human_all_demos.hdf5"
     },
     "algo": {
         "optim_params": {
@@ -156,7 +156,7 @@
             "spatial_softmax_num_kp": 64,
             "gmm_min_std": 0.0001,
             "dropout": 0.1,
-            "trained_highlevel_planner": "/user/frosa/Multi-Task-LFD-Framework/repo/mimic-play/MimicPlay/trained_models_highlevel_human_panda_pick_place_all_demos_augmented_goal_intermediate_mix_agent_demo/test/20251224121215/models/model_epoch_583_best_validation_-58.197113037109375.pth",
+            "trained_highlevel_planner": "/user/frosa/Multi-Task-LFD-Framework/repo/mimic-play/MimicPlay/trained_models_highlevel_human_panda_3D_state_intermediate_frames/test/20260106113019/models/model_epoch_345_best_validation_-57.05151214599609.pth",
             "eval_goal_img_window": 30,
             "eval_max_goal_img_iter": 5
         },
@@ -173,8 +173,9 @@
         "modalities": {
             "obs": {
                 "low_dim": [
-                    "robot0_eef_pos",
-                    "robot0_eef_quat",
+                    "robot0_eef_pos_3d_world",
+                    "robot0_eef_pos_3d_camera",
+                    "robot0_eef_quat_world",
                     "robot0_gripper_qpos"
                 ],
                 "rgb": [

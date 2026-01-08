@@ -340,12 +340,18 @@ class PlaydataSequenceDataset(SequenceDataset):
             prefix="obs"
         )
         
+        if 'robot0_eef_pos_3d_camera' in meta["obs"].keys():
+            # new key name for 3D eef pos in camera frame
+            new_key = 'robot0_eef_pos_3D_0'
+            meta["obs"][new_key] = meta["obs"]['robot0_eef_pos_3d_camera']
+            del meta["obs"]['robot0_eef_pos_3d_camera']
+          
         # reduce dimension 
         for key in meta["obs"].keys():
             if 'robot0_eef_pos' in key:
                 state_key = key
-                break
-            
+                break  
+          
         # check if state contains inf values
         if np.any(np.isinf(meta["obs"][state_key])):
             print(f"Found inf values in demo {demo_id} at index {index_in_demo}")
@@ -397,7 +403,7 @@ class PlaydataSequenceDataset(SequenceDataset):
                 meta["goal_obs"] = self.get_sequence_from_human_demo(
                     demonstrator_id,
                     index_in_demo=goal_index,
-                    keys=['agentview_image', 'robot0_eef_pos'],
+                    keys=['agentview_image'], #['agentview_image', 'robot0_eef_pos_3D_0'],
                     num_frames_to_stack=self.n_frame_stack - 1,
                     seq_length=self.seq_length,
                     prefix="obs"
@@ -405,11 +411,17 @@ class PlaydataSequenceDataset(SequenceDataset):
                 
         
             # reduce dimension 
-            if len(meta["goal_obs"][state_key].shape) == 3:
-                
-                for key in meta["goal_obs"].keys():
-                    if 'agentview_image' not in key and 'robot0_eye_in_hand_image' not in key:
-                        meta["goal_obs"][key] = np.reshape(meta["goal_obs"][key], (meta["goal_obs"][key].shape[0], meta["goal_obs"][key].shape[-1]))
+            if self.demo_path is None:
+                # training high-level policies
+                if len(meta["goal_obs"][state_key].shape) == 3:
+                    for key in meta["goal_obs"].keys():
+                        if 'agentview_image' not in key and 'robot0_eye_in_hand_image' not in key:
+                            meta["goal_obs"][key] = np.reshape(meta["goal_obs"][key], (meta["goal_obs"][key].shape[0], meta["goal_obs"][key].shape[-1]))
+            else:
+                if meta["goal_obs"].get('robot0_eef_pos_3D_0', None) is not None  and len(meta["goal_obs"]['robot0_eef_pos_3D_0'].shape) == 3:
+                    for key in meta["goal_obs"].keys():
+                        if 'agentview_image' not in key and 'robot0_eye_in_hand_image' not in key:
+                            meta["goal_obs"][key] = np.reshape(meta["goal_obs"][key], (meta["goal_obs"][key].shape[0], meta["goal_obs"][key].shape[-1]))
                 
                 
         

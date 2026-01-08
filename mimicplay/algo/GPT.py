@@ -765,10 +765,17 @@ class GPT_wrapper(nn.Module):
         return grid
 
     def forward_train(self, obs):
-        b, seq, _ = obs['robot0_eef_pos'].size()
+        
+        b, seq, _ = obs["robot0_eef_pos_3d_world"].size()
 
         x_ee_image = obs['robot0_eye_in_hand_image']
-        x_ee_image = x_ee_image.view(b*seq, 3, 84, 84)
+
+        if x_ee_image.shape[-1] != 84:
+            # resize to 84x84
+            x_ee_image = F.interpolate(x_ee_image.view(b*seq, 3, x_ee_image.shape[-2], x_ee_image.shape[-1]), size=(84, 84), mode='bilinear', align_corners=True)
+        else:
+            x_ee_image = x_ee_image.view(b*seq, 3, 84, 84) #x_ee_image.view(b*seq, 3, 84, 84)
+        
         grid_shifted = self.random_crop_grid(x_ee_image, self.grid_source)
         x_ee_image = F.grid_sample(x_ee_image, grid_shifted, align_corners=True)
 
@@ -776,7 +783,7 @@ class GPT_wrapper(nn.Module):
         x_ee_image = self.ee_spatial_softmax(x_ee_image)
         x_ee_image = x_ee_image.view(b, seq, 128).contiguous()
 
-        x_pose = torch.cat((obs["robot0_eef_pos"], obs["robot0_eef_quat"]), dim=-1).contiguous()
+        x_pose = torch.cat((obs["robot0_eef_pos_3d_world"], obs["robot0_eef_quat_world"]), dim=-1).contiguous()
         x_pose_feat = self.mlp_encoder_pose(x_pose)
 
         x_feature = obs['latent_plan']

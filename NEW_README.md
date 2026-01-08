@@ -50,7 +50,9 @@ python scripts/low_level_demo_task_id_mapping.py
 
 # train
 # Note: Remember to change trained_highlevel_planner and demo_path in configs/new_lowlevel.json
-python scripts/train.py --config configs/new_lowlevel.json --dataset '/user/frosa/multi_task_lfd/datasets/pick_place/human_rgb_pick_place/hdf5/merged_dataset/human_ur5e_robot_merged.hdf5'
+# robot0_eef_pos_3d_world: used for low-level policy
+# robot0_eef_pos_3d_camera: used for high-level controller
+python scripts/train.py --config configs/new_lowlevel.json --dataset '/user/frosa/multi_task_lfd/ur_multitask_dataset/pick_place/ur5e_pick_place/hdf5_files/merged_dataset/ur5e_all_demos.hdf5'
 
 ```
 
