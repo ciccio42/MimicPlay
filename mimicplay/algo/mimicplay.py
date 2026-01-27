@@ -4,6 +4,7 @@ Implementation of MimicPlay and PlayLMP baselines (formalized as BC-RNN (robomim
 from collections import OrderedDict
 
 import copy
+import json
 import h5py
 import torch
 import torch.nn as nn
@@ -88,22 +89,38 @@ class Highlevel_GMM_pretrain(BC_Gaussian):
         self.nets["policy"].eval()
 
     def load_eval_video_prompt(self, video_path):
+        self.video_path = video_path
         self.prompt = h5py.File(video_path, 'r')
          
-    def perform_test_predictions(self, save_folder, agent_path=None, validation=True, same_video=True, sample_goal=True, cfg=None):
+    def perform_test_predictions(self, save_folder, agent_path=None, validation=True, same_video=True, sample_goal=True, same_configuration=False, cfg=None, agent_name="panda", state_3d=False, json_path=None):
 
         assert cfg is not None, "cfg must be provided for agent and demo keys"
 
         if agent_path is not None:
             agent_real = True if 'real' in agent_path else False
         
-        exp_name = f"prompt_real_human_agent_real_{agent_real}_sample_goal_{sample_goal}"
-        save_path = os.path.join("..", save_folder,"test/", f"video_{exp_name}")
-        os.makedirs(save_path, exist_ok=True)
+        exp_name = f"prompt_real_human_agent_real_{agent_real}_sample_goal_{sample_goal}_same_conf_{same_configuration}"
+        
 
         # create obs and goal dict
         obs = {}
         goal = {}
+        
+        # if same_configuration:
+        #     map_id_for_same_conf_path = self.video_path.replace('.hdf5', f'_agent_{agent_name}_map_id_for_same_conf.json')
+        #     with open(map_id_for_same_conf_path, 'r') as f:
+        #         map_id_for_same_conf = json.load(f)
+        #     print(f"Loaded map_id_for_same_conf from {map_id_for_same_conf_path}")
+        
+        if json_path is not None:
+            with open(json_path, 'r') as f:
+                map_id_for_same_conf = json.load(f)
+            print(f"Loaded map_id_for_same_conf from {json_path}")
+            
+        save_path = os.path.join("..", save_folder,f"test/{agent_name}", f"video_{exp_name}")
+        os.makedirs(save_path, exist_ok=True)
+            
+        
         
         if validation:
             # filter for validation demo
@@ -133,27 +150,27 @@ class Highlevel_GMM_pretrain(BC_Gaussian):
                     demo_obs = goal_img[None, :].to(torch.float32).to(self.device)
                 else:
                     if 'future_traj' not in demo_obs_key:
-                        demo_obs = torch.from_numpy(self.prompt['data'][demo_key]['obs'][demo_obs_key][-1,:, :3])[None, :].to(torch.float32).to(self.device)
+                        if state_3d:
+                            demo_obs = torch.from_numpy(self.prompt['data'][demo_key]['obs'][demo_obs_key][-1,:, :3])[None, :].to(torch.float32).to(self.device)
+                        else:
+                            demo_obs = torch.from_numpy(self.prompt['data'][demo_key]['obs'][demo_obs_key][-1,:2]).to(torch.float32).to(self.device)
                     else:
                         demo_obs = torch.from_numpy(self.prompt['data'][demo_key]['obs'][demo_obs_key][-1]).to(torch.float32).to(self.device)
                 
                 goal[demo_obs_key] = demo_obs
             
-            # check if demo and agent are the same task
-            # if agent_path is not None:
-            #     task_agent = agent_path.split('/')[-5]
-            #     if self.prompt['data'][demo_key].attrs['task'] != task_agent:
-            #         print(f"Warning: demo {demo_key.decode()} and agent_path {agent_path} are not the same task!")
-            #         agent_path = agent_path.replace(task_agent, self.prompt['data'][demo_key].attrs['task'])
-            
             for agent_key in agent_keys:
                 task_agent = self.agent['data'][agent_key].attrs['task']
-                # if (not same_video and agent_key == demo_key) or (self.prompt['data'][demo_key].attrs['task'] != self.prompt['data'][agent_key].attrs['task']):
-                #     continue
-                # elif same_video and agent_key != demo_key and self.prompt['data'][demo_key].attrs['task'] != self.prompt['data'][agent_key].attrs['task']:
-                #     continue
-                # elif same_video and agent_key == demo_key and self.prompt['data'][demo_key].attrs['task'] == self.prompt['data'][agent_key].attrs['task']:
+
                 if self.prompt['data'][demo_key].attrs['task'] == self.agent['data'][agent_key].attrs['task']:
+                    
+                    if same_configuration:
+                        if agent_key.decode() not in map_id_for_same_conf:
+                            print(f"Agent demo {agent_key.decode()} not in map for same configuration, skipping...")
+                            continue
+                        if demo_key.decode() not in map_id_for_same_conf[agent_key.decode()]['train'] and demo_key.decode() not in map_id_for_same_conf[agent_key.decode()]['val']:
+                            print(f"Demo {demo_key.decode()} not in map for same configuration for agent demo {agent_key.decode()}, skipping...")
+                            continue
                     
                     if agent_path is not None:
                         # agent_task = agent_path.split('/')[-2]
@@ -191,9 +208,15 @@ class Highlevel_GMM_pretrain(BC_Gaussian):
                             else:
                                 if 'future_traj' not in key:
                                     agent_obs = obs_data['obs'][key][t]
-                                    if key == 'robot0_eef_pos_3d_camera':
-                                        new_key = "robot0_eef_pos_3D_0"
-                                    obs[new_key] = torch.from_numpy(agent_obs[:3])[None, :].to(torch.float32).to(self.device)
+                                    if state_3d:
+                                        if key == 'robot0_eef_pos_3d_camera':
+                                            new_key = 'robot0_eef_pos_3d_camera' #"robot0_eef_pos_3D_0"
+                                            obs[new_key] = torch.from_numpy(agent_obs[:3])[None, :].to(torch.float32).to(self.device)
+                                    else:
+                                        if key == 'robot0_eef_pos_px':
+                                            new_key = 'robot0_eef_pos' 
+                                        obs[new_key] = torch.from_numpy(agent_obs[:2])[None, :].to(torch.float32).to(self.device)
+                                    
                                 else:
                                     agent_obs = obs_data['obs'][key][t]
                                     obs[key] = torch.from_numpy(agent_obs).to(torch.float32).to(self.device)
@@ -201,7 +224,7 @@ class Highlevel_GMM_pretrain(BC_Gaussian):
 
                         if sample_goal:
                             # overwrite goal with random frame from the goal video
-                            goal_index = min(t + 10, goal_image_length - 1)
+                            goal_index = min(t+5, goal_image_length - 1) #goal_image_length - 1 #min(t + 10, goal_image_length - 1)
                             
                             for demo_obs_key in cfg['demo_obs_keys']:
                                 if 'image' in demo_obs_key:
@@ -210,7 +233,10 @@ class Highlevel_GMM_pretrain(BC_Gaussian):
                                     goal[demo_obs_key] = goal_img[None, :].to(torch.float32).to(self.device)
                                 else:
                                     if 'future_traj' not in demo_obs_key:
-                                        goal[demo_obs_key] = torch.from_numpy(self.prompt['data'][demo_key]['obs'][demo_obs_key][goal_index][:3])[None, :].to(torch.float32).to(self.device)
+                                        if state_3d:
+                                            goal[demo_obs_key] = torch.from_numpy(self.prompt['data'][demo_key]['obs'][demo_obs_key][goal_index][:3])[None, :].to(torch.float32).to(self.device)
+                                        else:
+                                            goal[demo_obs_key] = torch.from_numpy(self.prompt['data'][demo_key]['obs'][demo_obs_key][goal_index][:2])[None, :].to(torch.float32).to(self.device)
                                     else:
                                         goal[demo_obs_key] = torch.from_numpy(self.prompt['data'][demo_key]['obs'][demo_obs_key][goal_index])[None, :].to(torch.float32).to(self.device)
                             

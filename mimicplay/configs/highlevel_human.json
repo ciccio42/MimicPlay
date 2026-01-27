@@ -35,7 +35,7 @@
     },
     "train": {
         "data": null,
-        "output_dir": "../trained_models_highlevel_human_panda_3D_state",
+        "output_dir": "../trained_models_highlevel_agent_UR5E_demo_HUMAN_3D_state_40_same_conf",
         "num_data_workers": 8,
         "hdf5_cache_mode": null,
         "hdf5_use_swmr": true,
@@ -54,7 +54,10 @@
         "batch_size": 32,
         "num_epochs": 3000,
         "seed": 1,
-        "mix_agent_demo": true
+        "mix_agent_demo": false,
+        "demo_path": "/user/frosa/multi_task_lfd/ur_multitask_dataset/pick_place/human_dataset/hdf5/merged_dataset/human_all_demos.hdf5",
+        "same_configuration": true,
+        "json_path": "/user/frosa/multi_task_lfd/ur_multitask_dataset/pick_place/human_dataset/hdf5/merged_dataset/human_all_demos_agent_ur5e_map_id_for_same_conf.json"
     },
     "algo": {
         "optim_params": {
@@ -141,8 +144,8 @@
         },
         "highlevel": {
             "enabled": true,
-            "ac_dim": 20,
-            "latent_plan_dim": 200
+            "ac_dim": 40,
+            "latent_plan_dim": 400
         },
         "lowlevel": {
             "enabled": false,
@@ -164,7 +167,7 @@
             "enabled": true,
             "goal_image_range": [
                 1,
-                20
+                10
             ],
             "eval_goal_gap": 150
         }
@@ -173,7 +176,7 @@
         "modalities": {
             "obs": {
                 "low_dim": [
-                    "robot0_eef_pos_3D_0",
+                    "robot0_eef_pos_3d_camera",
                     "robot0_eef_pos_future_traj"
                 ],
                 "rgb": [

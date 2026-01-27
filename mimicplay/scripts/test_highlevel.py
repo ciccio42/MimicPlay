@@ -98,17 +98,36 @@ def test(config, args, device):
     # load task video prompt
     model.policy.load_eval_video_prompt(args.video_prompt)
 
-    obs_keys = {
-        "demo_obs_keys": ["agentview_image", "robot0_eef_pos_3D_0", "robot0_eef_pos_future_traj"],
-        "agent_obs_keys": ["agentview_image", "robot0_eef_pos_3d_camera", "robot0_eef_pos_future_traj"]
-    }
+    # obs_keys = {
+    #     "demo_obs_keys": ["agentview_image", "robot0_eef_pos_3D_0", "robot0_eef_pos_future_traj"],
+    #     "agent_obs_keys": ["agentview_image", "robot0_eef_pos_3d_camera", "robot0_eef_pos_future_traj"]
+    # }
+
+
+    agent_name = args.agent_path.split('/')[-1].split('_')[0] if args.agent_path is not None else "panda"
+    state_3d = True if '3d' in config.train.output_dir.lower() else False
+
+    if state_3d:
+        obs_keys = {
+            "demo_obs_keys": ["agentview_image", "robot0_eef_pos", "robot0_eef_pos_future_traj"],
+            "agent_obs_keys": ["agentview_image", "robot0_eef_pos_3d_camera", "robot0_eef_pos_future_traj"]
+        }
+    else:
+        obs_keys = {
+            "demo_obs_keys": ["agentview_image", "robot0_eef_pos", "robot0_eef_pos_future_traj"],
+            "agent_obs_keys": ["agentview_image", "robot0_eef_pos_px", "robot0_eef_pos_future_traj"]
+        }
+
 
     model.policy.perform_test_predictions(save_folder=config.train.output_dir, 
                                           validation=True,
                                           agent_path=args.agent_path,
-                                          sample_goal=True if 'intermediate' in config.train.output_dir else False,
-                                          cfg=obs_keys)
-    
+                                          sample_goal=True, #if 'intermediate' in config.train.output_dir else False,
+                                          same_configuration=config['train'].get('same_configuration', False),
+                                          cfg=obs_keys,
+                                          agent_name=agent_name,
+                                          state_3d=state_3d,
+                                          json_path=config.train['json_path'] if 'json_path' in config.train else None)
 
 def main(args):
     if args.config is not None:

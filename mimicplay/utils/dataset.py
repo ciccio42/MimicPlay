@@ -33,6 +33,8 @@ class PlaydataSequenceDataset(SequenceDataset):
             aug_p = 0.5,
             mix_agent_demo = False,
             demo_path=None,
+            same_configuration=False,
+            json_path=None,
             train=True
     ):
         """
@@ -177,13 +179,24 @@ class PlaydataSequenceDataset(SequenceDataset):
         
         # path to demonstration dataset
         self.demo_path = demo_path
+        self.same_configuration = same_configuration
         if self.demo_path is not None:
-            self.demo_dataset = h5py.File(self.demo_path, "r")
             
-            # open json file to get task demo_id mapping for demonstration dataset
-            json_path = self.demo_path.replace('.hdf5', '_low_level_human_demo_task_demo_id_mapping.json')
-            with open(json_path, 'r') as f:
-                self.demo_task_demo_id_mapping = json.load(f)
+            if not same_configuration:
+                self.demo_dataset = h5py.File(self.demo_path, "r")
+                self.json_path = json_path
+                with open(self.json_path, 'r') as f:
+                    self.demo_task_demo_id_mapping = json.load(f)
+                # open json file to get task demo_id mapping for demonstration dataset
+                # json_path = self.demo_path.replace('.hdf5', '_low_level_human_demo_task_demo_id_mapping.json')
+                # with open(json_path, 'r') as f:
+                #     self.demo_task_demo_id_mapping = json.load(f)
+            else:
+                # load only demos with same initial target location
+                self.demo_dataset = h5py.File(self.demo_path, "r")
+                self.json_path = json_path
+                with open(self.json_path, 'r') as f:
+                    self.demo_task_demo_id_mapping = json.load(f)
         self.train = train
             
 
@@ -281,7 +294,7 @@ class PlaydataSequenceDataset(SequenceDataset):
             num_frames_to_stack=self.n_frame_stack - 1, # note: need to decrement self.n_frame_stack by one
             seq_length=self.seq_length
         )
-
+        
         if 'actions_robot' in meta.keys() and meta['actions_robot'].shape[0] <= self.seq_length:
             # pad actions_robot to have at least seq_length
             pad_len = self.seq_length - meta['actions_robot'].shape[0] 
@@ -320,15 +333,32 @@ class PlaydataSequenceDataset(SequenceDataset):
                 # get task_name from agent
                 task_name = self.hdf5_file['data'][demo_id].attrs['task']
                 # pick random demo_id from human demos for the same task
-                split_key = 'train' if self.train else 'val'
-                demonstrator_id = np.random.choice(self.demo_task_demo_id_mapping[split_key][task_name])
-                demo_len = self.demo_dataset['data'][demonstrator_id].attrs['num_samples']
-                goal_index = None
-                if self.goal_mode == "nstep":
-                    goal_index = min(index_in_demo + random.randint(self.goal_obs_gap[0], self.goal_obs_gap[1]) , demo_len) - 1
-                if self.goal_mode == "last":
-                    goal_index = demo_len - 1
-                human_demo = True
+                if not self.same_configuration:
+                    split_key = 'train' if self.train else 'val'
+                    
+                    demonstrator_id = self.demo_task_demo_id_mapping[demo_id][split_key].pop(0)
+                    self.demo_task_demo_id_mapping[demo_id][split_key].append(demonstrator_id)
+                    # demonstrator_id = np.random.choice(self.demo_task_demo_id_mapping[split_key][task_name])
+                    demo_len = self.demo_dataset['data'][demonstrator_id].attrs['num_samples']
+                    goal_index = None
+                    if self.goal_mode == "nstep":
+                        goal_index = min(index_in_demo + random.randint(self.goal_obs_gap[0], self.goal_obs_gap[1]) , demo_len) - 1
+                    if self.goal_mode == "last":
+                        goal_index = demo_len - 1
+                    human_demo = True
+                else:
+                    split_key = 'train' if self.train else 'val'
+                    # get list of human demos with same configuration
+                    demonstrator_id = self.demo_task_demo_id_mapping[demo_id][split_key].pop(0)
+                    self.demo_task_demo_id_mapping[demo_id][split_key].append(demonstrator_id)
+                    demo_len = self.demo_dataset['data'][demonstrator_id].attrs['num_samples']
+                    goal_index = None
+                    if self.goal_mode == "nstep":
+                        goal_index = min(index_in_demo + random.randint(self.goal_obs_gap[0], self.goal_obs_gap[1]) , demo_len) - 1
+                    if self.goal_mode == "last":
+                        goal_index = demo_len - 1
+                    human_demo = True
+                    
                 
 
         meta["obs"] = self.get_obs_sequence_from_demo(
@@ -342,9 +372,9 @@ class PlaydataSequenceDataset(SequenceDataset):
         
         if 'robot0_eef_pos_3d_camera' in meta["obs"].keys():
             # new key name for 3D eef pos in camera frame
-            new_key = 'robot0_eef_pos_3D_0'
+            new_key = 'robot0_eef_pos_3d_camera' #'robot0_eef_pos_3D_0'
             meta["obs"][new_key] = meta["obs"]['robot0_eef_pos_3d_camera']
-            del meta["obs"]['robot0_eef_pos_3d_camera']
+            # del meta["obs"]['robot0_eef_pos_3d_camera']
           
         # reduce dimension 
         for key in meta["obs"].keys():
@@ -418,7 +448,8 @@ class PlaydataSequenceDataset(SequenceDataset):
                         if 'agentview_image' not in key and 'robot0_eye_in_hand_image' not in key:
                             meta["goal_obs"][key] = np.reshape(meta["goal_obs"][key], (meta["goal_obs"][key].shape[0], meta["goal_obs"][key].shape[-1]))
             else:
-                if meta["goal_obs"].get('robot0_eef_pos_3D_0', None) is not None  and len(meta["goal_obs"]['robot0_eef_pos_3D_0'].shape) == 3:
+                # if meta["goal_obs"].get('robot0_eef_pos_3D_0', None) is not None  and len(meta["goal_obs"]['robot0_eef_pos_3D_0'].shape) == 3:
+                if meta["goal_obs"].get('robot0_eef_pos_3d_camera', None) is not None  and len(meta["goal_obs"]['robot0_eef_pos_3d_camera'].shape) == 3:
                     for key in meta["goal_obs"].keys():
                         if 'agentview_image' not in key and 'robot0_eye_in_hand_image' not in key:
                             meta["goal_obs"][key] = np.reshape(meta["goal_obs"][key], (meta["goal_obs"][key].shape[0], meta["goal_obs"][key].shape[-1]))
@@ -448,8 +479,15 @@ class PlaydataSequenceDataset(SequenceDataset):
                                                                 new_color=new_arm_color)
                 
         # replace actions_robot key with actions key
+        # if len(meta["actions"][0]) == 40:
+        #     meta["actions"] = meta["actions"][:, :20] 
+            
+        # if len(meta['obs']['robot0_eef_pos_future_traj'][0]) == 40:
+        #     meta['obs']['robot0_eef_pos_future_traj'] = meta['obs']['robot0_eef_pos_future_traj'][:, :20]
+        
         if "actions_robot" in meta.keys():
             meta["actions"] = meta["actions_robot"]
             del meta["actions_robot"]
-                
+        
+        
         return meta

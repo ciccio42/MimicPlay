@@ -477,5 +477,5 @@ class RolloutPolicy(object):
         ob = self._prepare_observation(ob)
         if goal is not None:
             goal = self._prepare_observation(goal)
-        ac = self.policy.get_action(obs_dict=ob, goal_dict=goal)
-        return TensorUtils.to_numpy(ac[0])
+        ac, guidance = self.policy.get_action(obs_dict=ob, goal_dict=goal)
+        return TensorUtils.to_numpy(ac[0]), TensorUtils.to_numpy(guidance[0])

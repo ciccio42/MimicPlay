@@ -171,6 +171,8 @@ def dataset_factory(config, obs_keys, filter_by_attribute=None, dataset_path=Non
         filter_by_attribute=filter_by_attribute,
         mix_agent_demo =config.train.mix_agent_demo,
         demo_path = config.train.demo_path,
+        same_configuration = config.train.same_configuration,
+        json_path = config.train.json_path,
         train = train,
     )
     dataset = PlaydataSequenceDataset(**ds_kwargs)

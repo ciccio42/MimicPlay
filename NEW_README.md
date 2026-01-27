@@ -57,3 +57,40 @@ python scripts/train.py --config configs/new_lowlevel.json --dataset '/user/fros
 ```
 
 ## 6. Test Low Level
+
+### Install Robosuite
+``` bash
+cd mimic-play && mkdir test_robot && cd test_robot
+git clone https://github.com/ciccio42/VLA-Bench.git
+cd test_robot/VLA-Bench/robosuite_test/conda_environments
+conda env create -f mimicplay_robosuite_1_0_1.yaml
+
+# Mimic-Play Requirements
+cd test_robot/VLA-Bench/robosuite_test/python_requirements
+pip install -r mimicplay_requirement.txt
+
+# Install robosuite
+git clone -b ur5e_ik https://github.com/ciccio42/robosuite.git
+cd robosuite
+pip install -r requirements.txt 
+pip install 'Cython<3.0'
+
+# Install multi_task_robosuite_env
+cd VLA-Bench/robosuite_test/tasks
+pip install -e .
+cd training
+pip install -e .
+
+# Install robomimic
+cd mimic-play/robomimic
+pip install -e .
+
+# Install mimic-play
+cd MimicPlay 
+pip install -e .
+
+# Run test 
+# Change model path in config
+source run_robosuite_eval.sh 0 false
+
+```

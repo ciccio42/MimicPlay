@@ -4,10 +4,10 @@ import cv2
 from PIL import Image
 
 view_id = 0 # change to 2 if drawing on second view
-FILE_NAME="/user/frosa/multi_task_lfd/datasets/pick_place/human_rgb_pick_place/hdf5/task_00/traj000.hdf5"
+FILE_NAME="/user/frosa/multi_task_lfd/ur_multitask_dataset/pick_place/real_new_ur5e_pick_place/task_00/traj000.pkl"
 
 with h5py.File(FILE_NAME, 'r') as f:
-    images = np.array(f['data/demo_0/obs/front_image_{}'.format(view_id)])
+    images = np.array(f['data/demo_0/obs/camera_front_image_{}'.format(view_id)])
     actions = np.array(f['data/demo_0/actions'])
     hand_loc = np.array(f['data/demo_0/obs/hand_loc'])   
     print(hand_loc[:, :, 0]*120)
@@ -20,7 +20,6 @@ actions = actions.reshape((num_timesteps, 10, 2))
 
 if view_id == 0:
     actions = actions[:, :, :2]
-    
 elif view_id == 1:
     actions = actions[:, :, 2:4]
 elif view_id == 2:

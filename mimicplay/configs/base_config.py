@@ -198,6 +198,8 @@ class BaseConfig(Config):
         
         self.train.mix_agent_demo = False  # whether to mix agent and human demos during training
         self.train.demo_path = None       # path to demonstration dataset, to be used when training low-level policies with human demos
+        self.train.same_configuration = False  # whether to sample demos from same initial env configuration during training
+        self.train.json_path = None        # path to json file containing mapping of task to demo ids when using same_configuration
 
     def algo_config(self):
         """

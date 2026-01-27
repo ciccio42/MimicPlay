@@ -19,6 +19,12 @@ CROP_PARAMS = [20, 25, 80, 75]  # top, bottom, left, right
 CAMERA_FRONT_POS = np.array([0.45, -0.002826249197217832, 1.27])
 CAMERA_FRONT_QUAT = np.array([0.26169506249574287, 0.25790267731943883, 0.6532651777140575, 0.6620018964346217])
 fov_y = 60  # degrees
+MAP_TARGET_OBJECT = {
+    0: 'greenbox',
+    1: 'yellowbox',
+    2: 'bluebox',
+    3: 'redbox'
+}
 
 
 def save_camera_projection(
@@ -401,6 +407,13 @@ def process_single_data_file(task, data_file, args):
     robot_future_eef_pos_list = []
 
     for t in range(1, len(traj)):
+        
+        if t == 1:
+            # get position of target object at the start of the demo
+            target_object_indx = traj[t]['obs']['target-object']
+            target_obj_name = MAP_TARGET_OBJECT[target_object_indx]
+            target_obj_pos_world = traj[t]['obs'][f'{target_obj_name}_pos']
+             
         # 1. Agent view
         agent_view = crop_and_resize(
             traj[t]['obs']['camera_front_image'],
@@ -459,7 +472,7 @@ def process_single_data_file(task, data_file, args):
         eef_pos_px = np.array(eef_pos_px) / agent_view.shape[0]
 
         # 5. Future EEF trajectory
-        num_future_frame = 10
+        num_future_frame = 20 #10
         skip_len = 2
         robot_future_eef_pos = []
 
@@ -494,6 +507,9 @@ def process_single_data_file(task, data_file, args):
                 current_quat=traj[t]['obs']['eef_quat'],
                 gripper_state=traj[t]['action'][-1],
             )
+            action_list.append(action)
+        elif t == len(traj) - 1:
+            action = np.zeros(7, dtype=np.float64)
             action_list.append(action)
 
         gripper_state = traj[t]['action'][-1]
@@ -535,6 +551,7 @@ def process_single_data_file(task, data_file, args):
 
         hf['data'].attrs['total'] = len(action_list)
         hf['data'].attrs['task'] = task_name
+        hf['data'].attrs['target_obj_pos'] = target_obj_pos_world
         
         hf.create_dataset(f'data/{demo_name}/actions_robot', data=np.array(action_list))
         hf.create_dataset(f'data/{demo_name}/actions', data=np.array(robot_future_eef_pos_list))
@@ -559,9 +576,6 @@ if __name__ == '__main__':
                         type=str,
                         default='/user/frosa/multi_task_lfd/ur_multitask_dataset/pick_place/ur5e_pick_place/hdf5_files',
                         help='Path to save the output HDF5 file.')
-    parser.add_argument('--convert_from_3D_to_px_space_flag', 
-                        action='store_true', 
-                        help='If set, include end-effector position in pixel space.')
     parser.add_argument('--plot', 
                         action='store_true')
     parser.add_argument('--debug', 

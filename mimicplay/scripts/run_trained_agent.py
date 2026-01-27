@@ -172,6 +172,13 @@ def rollout(policy, env, horizon, render=False, video_writer=None, video_skip=5,
 
 
 def run_trained_agent(args):
+    
+    import debugpy
+    debugpy.listen(5678)
+    print("Waiting for debugger attach...")
+    debugpy.wait_for_client()
+    print("Debugger attached.")
+    
     # some arg checking
     write_video = (args.video_path is not None)
     assert not (args.render and write_video) # either on-screen or video but not both

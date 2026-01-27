@@ -25,7 +25,7 @@
         "keep_all_videos": false,
         "video_skip": 5,
         "rollout": {
-            "enabled": true,
+            "enabled": false,
             "n": 10,
             "horizon": 1600,
             "rate": 1,
@@ -35,7 +35,7 @@
     },
     "train": {
         "data": null,
-        "output_dir": "../trained_models_lowlevel",
+        "output_dir": "../provola_trained_models_lowlevel",
         "num_data_workers": 2,
         "hdf5_cache_mode": "low_dim",
         "hdf5_use_swmr": true,

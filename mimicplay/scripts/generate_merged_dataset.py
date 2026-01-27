@@ -9,13 +9,75 @@ from PIL import Image
 import copy
 import numpy as np
 
+
+Y_SPAWN_REGION = [[0.255, 0.195], [0.105, 0.045], [-0.045, -0.105], [-0.195, -0.255]]
+
+# ID spawn region - Value list of variation
+SPAWN_Task_MAP = {
+    0: [0, 1, 2, 3],
+    1: [4, 5, 6, 7],
+    2: [8, 9, 10, 11],
+    3: [12, 13, 14, 15]
+}
+
+
+def filter_hdf5_files(hdf5_files, task_folder, debug=False):
+    task_id = int(task_folder.split('_')[-1])
+    filtered_files = []
+    
+    
+    for hdf5_file in hdf5_files:
+        traj_num = int(hdf5_file.split("/")[-1].split(".")[0].split("traj")[-1])
+        with h5py.File(hdf5_file, "r") as f:
+            # check spawn position
+            spawn_indx = -1
+            target_obj_pos_y = f['data'].attrs['target_obj_pos'][1]
+            for indx, y_region in enumerate(Y_SPAWN_REGION):
+                if target_obj_pos_y <= y_region[0] and target_obj_pos_y >= y_region[1]:
+                    spawn_indx = indx
+                    break
+            # for t, action in enumerate(f['data']['demo_0']['actions_robot']):
+            #     if action[-1] == 1.0: # gripper closed
+            #         # verify spawn index
+            #         pos_y = f['data']['demo_0']['obs']['robot0_eef_pos_3d_world'][t-1][1]
+            #         if traj_num == 10 and debug:
+            #             print(f"Debug: Traj {traj_num}, pos_y: {pos_y}")
+            #         for indx, y_region in enumerate(Y_SPAWN_REGION):
+            #             if pos_y <= y_region[0] and pos_y >= y_region[1]:
+            #                 spawn_indx = indx
+            #                 break
+            #         break
+                    
+            if spawn_indx == -1:
+                raise ValueError(f"Could not determine spawn index for file {hdf5_file}")  
+                
+            # check if task_id and spawn_indx match
+            include_file = False
+            if task_id in SPAWN_Task_MAP[spawn_indx]:
+                filtered_files.append(hdf5_file)
+                if debug:
+                    print(f"Including {hdf5_file} for task id {task_id} and spawn index {spawn_indx}.")
+                include_file = True
+            else:
+                if debug:
+                    print(f"Skipping {hdf5_file} as task id {task_id} not in SPAWN_Task_MAP for spawn index {spawn_indx}.")
+                include_file = False
+            if True: #and debug:
+                # plot image
+                pil_img = Image.fromarray(f['data']['demo_0']['obs']['agentview_image'][0])
+                pil_img.save(f'debug_images/debug_spawn_task_{task_id}_spawn_{spawn_indx}_include_{include_file}_traj_number_{traj_num}.png')
+                
+                
+    return filtered_files
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Generate human dataset')
     parser.add_argument('--task_folder', default="/user/frosa/multi_task_lfd/ur_multitask_dataset/pick_place/ur5e_pick_place/hdf5_files/", type=str, help='Path to the task folder')
     parser.add_argument('--output_folder', default="/user/frosa/multi_task_lfd/ur_multitask_dataset/pick_place/ur5e_pick_place/hdf5_files/merged_dataset", type=str, help='Path to the output folder')
-    parser.add_argument('--robot_name', default="provola", type=str, help='Name of the robot')
-    parser.add_argument('--dataset_type', default="all_demos", type=str, help='Type of dataset to generate')
-    parser.add_argument('--config_path', default="scripts/config.json", type=str, help='Path to the config file')
+    parser.add_argument('--robot_name', default="ur5e", type=str, help='Name of the robot')
+    parser.add_argument('--dataset_type', default="all_demos", type=str, help='Type of dataset to generate [same_target_place / all_demos / one_spawn_per_task]')
+    parser.add_argument('--config_path', default="config.json", type=str, help='Path to the config file')
     parser.add_argument('--debug', action='store_true', help='Enable debug mode')
     
     args = parser.parse_args()
@@ -46,6 +108,7 @@ if __name__ == '__main__':
     for task_folder in task_folders:
         print(f"Processing task folder: {task_folder}")
         
+        # get all the hdf5 files in the task folder
         hdf5_files = glob.glob(os.path.join(task_folder, "*.hdf5"))
         
         # order hdf5 files by numeric order based on filename
@@ -54,16 +117,24 @@ if __name__ == '__main__':
         elif args.dataset_type == "all_demos":
             hdf5_files = sorted(hdf5_files, key=lambda x: int(x.split("/")[-1].split(".")[0].split("traj")[-1]))
         
+        
+        if args.dataset_type == "one_spawn_per_task":
+            # filter hdf5 files based on spawn region
+            hdf5_files = filter_hdf5_files(hdf5_files, task_folder, args.debug)
+        
+        
+        
         train_num_files = int(len(hdf5_files) * train_val_split)
         
-        for hdf5_file in hdf5_files:
+        for indx, hdf5_file in enumerate(hdf5_files):
             # print(f"\t{hdf5_file}")
-            file_cnt += 1
+            
             # open hdf5 file
             with h5py.File(hdf5_file, "r") as f:
                 # read data from hdf5 file
                 print(f"hdf5 file keys: {list(f['data'].keys())}")
-                
+                                            
+                file_cnt += 1
                 # get demo_0
                 demo_0 = f["data"]["demo_0"]
                 
@@ -123,7 +194,8 @@ if __name__ == '__main__':
                     new_fout[f'data/demo_{demo_number}'].attrs["num_samples"] = demo_0.attrs["num_samples"]
                 else:
                     new_fout[f'data/demo_{demo_number}'].attrs["num_samples"] = demo_0['obs']['agentview_image'].shape[0]
-                new_fout[f'data/demo_{demo_number}'].attrs['task'] = task_folder.split('/')[-1]      
+                new_fout[f'data/demo_{demo_number}'].attrs['task'] = task_folder.split('/')[-1]
+                new_fout[f'data/demo_{demo_number}'].attrs['target_obj_pos'] = f['data'].attrs['target_obj_pos']    
                 print(f"Added demo_{demo_number} from {hdf5_file} with length {new_fout[f'data/demo_{demo_number}'].attrs['num_samples']}")
                 
                 if args.dataset_type == "same_target_place": 
@@ -139,7 +211,12 @@ if __name__ == '__main__':
                         train_demo_number.append(demo_number)
                     else:
                         val_demo_number.append(demo_number)
-                
+                elif args.dataset_type == "one_spawn_per_task":
+                    if indx < train_num_files:
+                        train_demo_number.append(demo_number)
+                    else:
+                        val_demo_number.append(demo_number)
+
                 demo_number += 1
                 
     new_fout['data'].attrs['total'] = num_samples

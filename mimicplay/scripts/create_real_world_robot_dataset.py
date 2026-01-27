@@ -143,11 +143,11 @@ if __name__ == '__main__':
                         help='If set, include end-effector position in pixel space.')
     args = parser.parse_args()
 
-    debugpy.listen(5678)
-    print("Waiting for debugger attach...")
-    debugpy.wait_for_client()
+    # debugpy.listen(5678)
+    # print("Waiting for debugger attach...")
+    # debugpy.wait_for_client()
 
-    task_list = glob.glob(os.path.join(args.data_dir, 'task_15'))
+    task_list = glob.glob(os.path.join(args.data_dir, 'task_*'))
     
     task_list.sort(key=lambda x: int(x.split('_')[-1]))
 
@@ -158,6 +158,7 @@ if __name__ == '__main__':
     T_camera_table = np.append(
         r_camera_table, p_camera_table, axis=1)
 
+    os.makedirs('debug_images', exist_ok=True)
     for task in task_list:
         print(f'Processing task directory: {task}')
         data_files = glob.glob(os.path.join(task, '*.pkl'))
@@ -246,7 +247,7 @@ if __name__ == '__main__':
                 # 4. Get the gripper state
                 gripper_q_pos = copy.deepcopy(gripper_state)
 
-                num_future_frame = 10
+                num_future_frame = 20 #10
                 skip_len = 2
                 robot_future_eef_pos = []
                 to_plot = copy.deepcopy(agent_view)
@@ -275,11 +276,17 @@ if __name__ == '__main__':
                      )
                    
                     # plot the adjusted point on the cropped and resized image
-                    # cv2.circle(to_plot, (next_pos_space[1], next_pos_space[0]), 3, (0, 0, 255), 3)
-                    # pil_img = Image.fromarray(to_plot)
-                    # pil_img.save(f'debug_images/agent_view_cropped_resized_{t}_{i}.png')
+                    cv2.circle(to_plot, (next_pos_space[1], next_pos_space[0]), 3, (0, 0, 255), 3)
+                    pil_img = Image.fromarray(to_plot)
+                    pil_img.save(f'debug_images/agent_view_cropped_resized_{t}_{i}.png')
                     
-                    robot_future_eef_pos.extend(next_pos_px_space/agent_view.shape[0])  # normalize to [0, 1]
+                    # check if the next_pos_px_space is [0,1]
+                    norm_next_pos_px_space = np.array(next_pos_space) / agent_view.shape[0]  # normalize to [0, 1]
+                    if np.any(norm_next_pos_px_space < 0) or np.any(norm_next_pos_px_space > 1):
+                        raise ValueError(f"Warning: Projected future end-effector position out of bounds at timestep {t}, future frame {i}: {norm_next_pos_px_space}")
+                        
+                    robot_future_eef_pos.extend(norm_next_pos_px_space)  # normalize to [0, 1]
+                    
                 
                 robot_future_eef_pos_list.append(robot_future_eef_pos)
 

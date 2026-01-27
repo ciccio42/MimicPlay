@@ -17,8 +17,8 @@ NUM_ACTION_PER_STEP = 2 * TOT_NUM_VIEWS
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Generate human dataset')
-    parser.add_argument('--dataset_paths', type=str, help='List of dataset paths to merge', nargs='+', default=["/user/frosa/multi_task_lfd/ur_multitask_dataset/pick_place/human_dataset/hdf5/merged_dataset/human_all_demos.hdf5", "/user/frosa/multi_task_lfd/ur_multitask_dataset/pick_place/panda_pick_place/hdf5_files/merged_dataset/panda_all_demos.hdf5"])
-    parser.add_argument('--robots_name', default=["panda"], type=str, help='List of robot names corresponding to dataset paths', nargs='+')
+    parser.add_argument('--dataset_paths', type=str, help='List of dataset paths to merge', nargs='+', default=["/user/frosa/multi_task_lfd/ur_multitask_dataset/pick_place/human_dataset/hdf5/merged_dataset/human_all_demos.hdf5", "/user/frosa/multi_task_lfd/ur_multitask_dataset/pick_place/ur5e_pick_place/hdf5_files/merged_dataset/ur5e_all_demos.hdf5"])
+    parser.add_argument('--robots_name', default=["ur5e"], type=str, help='List of robot names corresponding to dataset paths', nargs='+')
     parser.add_argument('--config_path', default="scripts/config.json", type=str, help='Path to the config file')
     parser.add_argument('--debug', action='store_true', help='Enable debug mode')
     parser.add_argument('--output_file_path', default=None, type=str, help='Path to the output file')
